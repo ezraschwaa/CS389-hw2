@@ -1,3 +1,4 @@
+#pragma once
 /*
  * Interface for a generic cache object.
  * Data is given as blobs (void *) of a given size,
@@ -18,7 +19,10 @@ typedef uint32_t index_type;
 typedef index_type (*hash_func)(key_type key);
 
 // User-defined type for an eviction policy. Unspecified by API.
-typedef void *evictor_type;
+enum evictor_type {
+	FIFO = 0,
+	LRU = 1,
+};
 
 // Create a new cache object with a given maximum memory capacity.
 // If hasher is NULL, use some kind of default (unspecified) has function.
@@ -35,7 +39,6 @@ void cache_set(cache_type cache, key_type key, val_type val, index_type val_size
 
 // Retrieve a pointer to the value associated with key in the cache,
 // or NULL if not found.
-// Sets the actual size of value in val_size.
 val_type cache_get(cache_type cache, key_type key, index_type *val_size);
 
 // Delete an object from the cache, if it's still there
