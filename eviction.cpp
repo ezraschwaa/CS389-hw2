@@ -69,33 +69,32 @@ void remove(DLL* list, DLL_index i) {
 }
 DLL_index append(DLL* list, DLL_value v) {//may grow
 	auto last = list->last;
+	auto nodes = list->nodes;
 	DLL_index i;
 	if(last == INVALID_NODE) {
 		i = 0;
-		Node* node = &list->nodes[i];
+		Node* node = &nodes[i];
 		node->val = v;
-		node->next = 1;
+		node->next = INVALID_NODE;
 		node->pre = INVALID_NODE;
 		list->first = i;
 		list->end = 1;
 	} else {
-		Node* last_node = &list->nodes[last];
-		Node* node = &list->nodes[last_node->next];
-		if(node->next == INVALID_NODE) {
-			
+		Node* last_node = &nodes[last];
+		i = last_node->next;
+		Node* node;
+		if(i == INVALID_NODE) {
+			i = list->end;
+			list->end += 1;
+			node = &nodes[i];
+			node->next = INVALID_NODE;
+		} else {
+			node = &nodes[i];
 		}
-		node->next = list->end;
 		node->pre = last;
-		list->end += 1
-	}
-
-	node->next = INVALID_NODE;
-	node->pre = INVALID_NODE;
-	if(list->end == INVALID_NODE) {
-	} else {
-		reorder(list, i, list->end);
 	}
 	list->last = i;
+	return i;
 }
 DLL_index prepend(DLL* list, DLL_value v) {//may grow
 	auto node = &list->nodes[i];

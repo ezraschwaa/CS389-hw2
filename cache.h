@@ -19,10 +19,11 @@ typedef uint32_t index_type;
 typedef index_type (*hash_func)(key_type key);
 
 // User-defined type for an eviction policy. Unspecified by API.
-enum evictor_type {
+enum {
 	FIFO = 0,
 	LRU = 1,
 };
+typedef long int evictor_type;
 
 // Create a new cache object with a given maximum memory capacity.
 // If hasher is NULL, use some kind of default (unspecified) has function.
