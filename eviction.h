@@ -8,20 +8,9 @@ using Value_ptr = val_type;
 using Index = index_type;
 using Hash_func = hash_func;
 
-using Evict_data = index_type;
-using DLL_value = Index;
-using DLL_index = Index;
-struct Node {
-	DLL_index next;
-	DLL_index pre;
-	DLL_value val;
-};
 struct DLL {
-	Node* nodes;
-	DLL_index size;
-	DLL_index end;
-	DLL_index last;
-	DLL_index first;
+	Index last;
+	Index first;
 };
 
 using Page_index = Index;
@@ -39,9 +28,8 @@ struct Book {
 
 // struct
 struct Rand_data {
-	Book book;
-	Index* indices;
-	Index total_i;
+	Index* rand_items;
+	Index total_items;
 };
 union Evictor_data {
 	DLL list;
@@ -53,18 +41,31 @@ struct Evictor {
 	Evictor_data data;
 };
 
-union Evict_data {
+struct Node {
+	Index next;
+	Index pre;
+};
+union Evict_item {
+	Index rand_i;
+	Node node;
+};
 
-}
+struct Evict_item_locator {
+	void* abs_first;
+	Index step_size;
+};
 
 
 void create_evictor(Evictor* evictor, evictor_type policy, Index size);
+void grow_evictor(Evictor* evictor, Index size);
 void delete_evictor(Evictor* evictor);
 
-Index evict_item(Evictor* evictor);
+Index evict_item(Evictor* evictor, Evict_item_locator loc);
 
-Evict_data add_item(Evictor* evictor, Index pid);
+void add_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc);
 
-void remove_item(Evictor* evictor, Evict_data i);
+void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc);
 
-void touch_item(Evictor* evictor, Evict_data i);
+void touch_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc);
+
+void update_item(Evictor* evictor, Index item_i, Evict_item* item, Index new_i, Evict_item_locator loc);
