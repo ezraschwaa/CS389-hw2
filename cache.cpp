@@ -13,17 +13,21 @@ using Value_ptr = val_type;
 using Index = index_type;
 using Hash_func = hash_func;
 
+struct Entry {
+	Key_ptr key;
+	Value_ptr value;
+	Index value_size;
+	Evict_item evict_item;
+};
+
 struct cache_obj {//Definition of Cache
 	Index mem_capacity;
 	Index mem_total;
 	Index entry_capacity;//this must now be a power of 2
 	Index entry_total;//records both alive and deleted entries
 	Hash_func hash;
-	Key_ptr* keys;
-	Index* key_hashes;
-	Value_ptr* values;//we can do a joint allocation to make the cache serializeable
-	Index* value_sizes;
-	Evict_pid* evict_pids;
+	Index* key_hashes;//we can do a joint allocation to make the cache serializeable
+	Entry** entries;
 	Evictor evictor;
 };
 

@@ -13,20 +13,6 @@ struct DLL {
 	Index first;
 };
 
-using Page_index = Index;
-using Page_data = Index;
-union Page {
-	Page_index next;
-	Page_data data;
-};
-struct Book {
-	Page* pages;
-	Page_index size;
-	Page_index end;
-	Page_index first;
-};
-
-// struct
 struct Rand_data {
 	Index* rand_items;
 	Index total_items;
