@@ -1,4 +1,3 @@
-#pragma once
 //By Monica Moniot
 #include "cache.h"
 
