@@ -166,22 +166,76 @@ DLL_index prepend(DLL* list, DLL_value v) {//may grow
 }
 
 
+Page_index INVALID_PAGE = -1;
+inline void create_book(Book* book, Page_index size) {
+	book->first = INVALID_PAGE;
+	book->end = 0;
+	book->size = size;
+	book->pages = new Page[size];
+}
+inline void delete_book(Book* book) {
+	delete book->pages;
+	book->pages = NULL;
+	book->size = 0;
+}
+inline void grow_book(Book* book) {
+	auto pre_size = book->size;
+	auto new_size = 2*pre_size;
+	Page* new_pages = new Page[new_size];
+	memcpy(new_pages, book->pages, pre_size);
+	book->size = new_size;
+	book->pages = new_pages;
+}
+inline Page_index alloc_book_page(Book* book) {
+	auto pages = book->pages;
+	auto i = book->first;
+	if(i == INVALID_PAGE) {
+		i = book->end;
+		book->end += 1;
+		if(i >= book->size) {
+			grow_book(book);
+		}
+	} else {
+		book->first = pages[i].next;
+	}
+	return i;
+}
+inline void free_book_page(Book* book, Page_index i) {
+	auto pages = book->pages;
+	(&pages[i])->next = book->first;
+	book->first = i;
+}
+inline Page_data* read_book(Book* book, Page_index i) {
+	return &book->pages[i].data;
+}
+
+
 void create_evictor(Evictor* evictor, evictor_type policy, Index init_capacity) {
 	evictor->policy = policy;
 	if(policy == FIFO) {
-		auto list = &evictor->list;
+		auto list = &evictor->data.list;
 		create_DLL(list, init_capacity);
 	} else if(policy == LRU) {
-		auto list = &evictor->list;
+		auto list = &evictor->data.list;
 		create_DLL(list, init_capacity);
+	} else {//RANDOM
+		auto data = &evictor->data.rand_data;
+		create_book(&data->book, init_capacity);
+		data->indices = new Index[init_capacity];
+		data->total_i = 0;
 	}
 }
 void delete_evictor(Evictor* evictor) {
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
-		delete_DLL(&evictor->list);
+		delete_DLL(&evictor->data.list);
 	} else if(policy == LRU) {
-		delete_DLL(&evictor->list);
+		delete_DLL(&evictor->data.list);
+	} else {//RANDOM
+		auto data = &evictor->data.rand_data;
+		delete_book(&data->book);
+		delete data->indices;
+		data->indices = NULL;
 	}
 }
 
@@ -189,43 +243,66 @@ Index evict_item(Evictor* evictor) {//return item to evict
 	auto policy = evictor->policy;
 	Index i = 0;
 	if(policy == FIFO) {
-		auto list = &evictor->list;
+		auto list = &evictor->data.list;
 		i = list->first;
 		remove(list, i);
 	} else if(policy == LRU) {
-		auto list = &evictor->list;
+		auto list = &evictor->data.list;
 		i = list->first;
 		remove(list, i);
+	} else {//RANDOM
+		auto data = &evictor->data.rand_data;
+		Evict_pid pid = rand()%data->total_i;
+		i = data->indices[pid];
+		// data->indices[pid] = da;
 	}
 	return i;
 }
 
-Evict_pid add_item(Evictor* evictor, Index pid) {//item was created
+Evict_pid add_item(Evictor* evictor, Index i) {//item was created
+	auto policy = evictor->policy;
+	Evict_pid pid;
+	if(policy == FIFO) {
+		pid = append(&evictor->data.list, i);
+	} else if(policy == LRU) {
+		pid = append(&evictor->data.list, i);
+	} else {//RANDOM
+		auto data = &evictor->data.rand_data;
+		if(data->book.end >= data->book.size) {
+			auto pre_size = data->book.size;
+			auto new_size = 2*pre_size;
+			auto new_indices = new Index[new_size];
+			memcpy(new_indices, data->indices, pre_size);
+			delete data->indices;
+			data->indices = new_indices;
+		}
+		pid = alloc_book_page(&data->book);
+		Index* item = read_book(&data->book, pid);
+		*item = data->total_i;
+		data->total_i += 1;
+		data->indices[*item] = i;
+	}
+	return pid;
+}
+
+void remove_item(Evictor* evictor, Evict_pid pid) {//item was removed
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
-		append(&evictor->list, pid);
+		auto list = &evictor->data.list;
+		remove(list, pid);
 	} else if(policy == LRU) {
-		append(&evictor->list, pid);
+		auto list = &evictor->data.list;
+		remove(list, pid);
 	}
 }
 
-void remove_item(Evictor* evictor, Evict_pid i) {//item was removed
+void touch_item(Evictor* evictor, Evict_pid pid) {//item was touched
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
-		auto list = &evictor->list;
-		remove(list, i);
-	} else if(policy == LRU) {
-		auto list = &evictor->list;
-		remove(list, i);
-	}
-}
 
-void touch_item(Evictor* evictor, Evict_pid i) {//item was touched
-	auto policy = evictor->policy;
-	if(policy == FIFO) {
-		
 	} else if(policy == LRU) {
-		auto list = &evictor->list;
-		reorder(list, list->last, i);
+
+		auto list = &evictor->data.list;
+		reorder(list, list->last, pid);
 	}
 }
