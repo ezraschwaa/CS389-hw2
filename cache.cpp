@@ -13,9 +13,9 @@ using Index = index_type;
 using Hash_func = hash_func;
 
 
-constexpr Index INITIAL_BOOK_CAPACITY = 128;//must be a power of 2
-constexpr double LOAD_FACTOR = 2;//^-1
-constexpr Index INITIAL_ENTRY_CAPACITY = LOAD_FACTOR*INITIAL_BOOK_CAPACITY;//must be a power of 2
+constexpr Index INIT_ENTRY_CAPACITY = 128;
+constexpr double LOAD_FACTOR = .5;
+constexpr Index INIT_HASH_TABLE_CAPACITY = static_cast<Index>(INIT_ENTRY_CAPACITY/LOAD_FACTOR);
 
 // Entry* entry = read_book(entry_book, bookmark);
 // remove_item (evictor, bookmark, &entry->evict_item, get_locator(cache));
@@ -42,7 +42,8 @@ struct cache_obj {//Definition of Cache
 	Index mem_capacity;
 	Index mem_total;
 	Index entry_capacity;//this must now be a power of 2
-	Index entry_total;//records both alive and deleted entries
+	Index entry_total;
+	Index dead_total;//records deleted entries
 	mem_unit* mem_arena;//we can do a joint allocation to make the cache serializeable
 	Book entry_book;
 	Hash_func hash;
@@ -86,11 +87,18 @@ inline Page_data* read_book(Book* book, Bookmark bookmark) {
 
 
 inline constexpr Index get_hash_table_capacity(Index entry_capacity) {
-	//if entry_total >= entry_capacity return true
-	//assert entry_capacity/INITIAL_BOOK_CAPACITY == hash_table_capacity/INITIAL_ENTRY_CAPACITY
-	//so entry_capacity == INITIAL_BOOK_CAPACITY*(hash_table_capacity/INITIAL_ENTRY_CAPACITY)
-	//so if entry_total >= INITIAL_BOOK_CAPACITY*(hash_table_capacity/INITIAL_ENTRY_CAPACITY) return true
-	return INITIAL_ENTRY_CAPACITY*(entry_capacity/INITIAL_BOOK_CAPACITY);
+	//let e = INIT_ENTRY_CAPACITY
+	//let h = INIT_HASH_TABLE_CAPACITY
+	//assert entry_capacity/e == hash_table_capacity/h
+	//so h*entry_capacity/e == h*(hash_table_capacity/h)
+	//so h*entry_capacity/e == (h*hash_table_capacity)/h
+	//so h*entry_capacity/e == hash_table_capacity
+	return INIT_HASH_TABLE_CAPACITY*(entry_capacity/INIT_ENTRY_CAPACITY);
+}
+inline constexpr bool is_exceeding_load(Index entry_total, Index dead_total, Index entry_capacity) {
+	bool is_exceed_entry = entry_total >= entry_capacity;
+	bool is_exceed_load_factor = entry_total + dead_total >= LOAD_FACTOR*get_hash_table_capacity(entry_capacity);
+	return is_exceed_entry or is_exceed_load_factor;
 }
 constexpr Index TOTAL_STEPS = 8;//must be power of 2
 inline constexpr Index get_step_size(Index key_hash, Index hash_table_capacity) {
@@ -100,7 +108,7 @@ inline constexpr Index get_step_size(Index key_hash, Index hash_table_capacity) 
 
 
 constexpr char NULL_TERMINATOR = 0;
-Index find_key_size(Key_ptr key) {//Includes the null terminator for the size
+Index find_key_size(Key_ptr key) {//Includes the null terminator in the size
 	Index size = 0;
 	while(key[size] != NULL_TERMINATOR) {
 		size += 1;
@@ -108,14 +116,14 @@ Index find_key_size(Key_ptr key) {//Includes the null terminator for the size
 	size += 1;
 	return size;
 }
-bool are_keys_equal(Key_ptr key0, Key_ptr key1) {
+bool are_keys_equal(Key_ptr key0, Key_ptr key1) {//must be null terminated
 	Index i = 0;
 	while(true) {
-		auto c = key0[i];
-		if(c != key1[i]) {
+		auto c0 = key0[i];
+		auto c1 = key1[i];
+		if(c0 != c1) {
 			return false;
-		}
-		if(c == NULL_TERMINATOR) {
+		} else if(c0 == NULL_TERMINATOR) {
 			return true;
 		}
 		i += 1;
@@ -160,7 +168,7 @@ inline mem_unit* allocate(Index entry_capacity, evictor_type policy) {
 	return new mem_unit[size_of_cache_data + size_of_book + size_of_evictor];
 }
 
-constexpr Key_ptr DELETED = &(Key_ptr(NULL)[1]);//stupid way of getting an invalid address as a constant
+constexpr Key_ptr DELETED = &static_cast<Key_ptr>(NULL)[1];//stupid way of getting an invalid address as a constant
 constexpr Index KEY_NOT_FOUND = -1;
 
 inline Index find_key(Cache* cache, Key_ptr key) {
@@ -187,7 +195,7 @@ inline Index find_key(Cache* cache, Key_ptr key) {
 	return KEY_NOT_FOUND;
 }
 
-inline void remove_entry(Cache* cache, Index i) {
+inline void remove_entry(Cache* cache, Index i) {//all entries get removed through here
 	auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
 	auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
 	auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
@@ -204,6 +212,7 @@ inline void remove_entry(Cache* cache, Index i) {
 
 	delete keys[i];
 	keys[i] = DELETED;
+	cache->dead_total += 1;
 	remove_evict_item(evictor, bookmark, &entry->evict_item, get_locator(cache), evict_data);
 	free_book_page(entry_book, bookmark);
 }
@@ -223,8 +232,8 @@ inline void update_mem_size(Cache* cache, Index mem_change) {
 	}
 }
 
-void grow_cache_size(Cache* cache) {
-	//assert entry_capacity/INITIAL_BOOK_CAPACITY == hash_table_capacity/INITIAL_ENTRY_CAPACITY
+inline void grow_cache_size(Cache* cache) {
+	//assert entry_capacity/INITIAL_BOOK_CAPACITY == hash_table_capacity/INIT_ENTRY_CAPACITY
 	auto const pre_capacity = cache->entry_capacity;
 	auto const new_capacity = 2*pre_capacity;
 	cache->entry_capacity = new_capacity;
@@ -243,11 +252,11 @@ void grow_cache_size(Cache* cache) {
 	auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
 	auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
 
-	Index new_total = 0;
-	for(Index i = 0; i < pre_capacity; i += 1) {
+	auto entries_left = cache->entry_total;
+	for(Index i = 0; entries_left <= 0; i += 1) {
 		Key_ptr key = pre_keys[i];
 		if(key != NULL and key != DELETED) {
-			new_total += 1;
+			entries_left -= 1;
 			Index key_hash = pre_key_hashes[i];
 			//find empty index
 			Index i = key_hash%new_capacity;
@@ -269,19 +278,20 @@ void grow_cache_size(Cache* cache) {
 			bookmarks[i] = bookmark;
 		}
 	}
-	cache->entry_total = new_total;
+	cache->dead_total = 0;
 
 	delete pre_mem_arena;
 }
 
 
 Cache* create_cache(Index max_mem, evictor_type policy, Hash_func hash) {
-	Index entry_capacity = INITIAL_ENTRY_CAPACITY;
+	Index entry_capacity = INIT_ENTRY_CAPACITY;
 	Cache* cache = new Cache;
 	cache->mem_capacity = max_mem;
 	cache->mem_total = 0;
 	cache->entry_capacity = entry_capacity;
 	cache->entry_total = 0;
+	cache->dead_total = 0;
 	cache->hash = hash;
 	auto mem_arena = allocate(entry_capacity, policy);
 	cache->mem_arena = mem_arena;
@@ -334,6 +344,7 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 		if(cur_key == NULL) {
 			break;
 		} else if(cur_key == DELETED) {
+			cache->dead_total -= 1;
 			break;
 		} else if(key_hashes[expected_i] == key_hash) {
 			if(are_keys_equal(cur_key, key)) {//found key
@@ -375,7 +386,7 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 	keys[new_i] = key_copy;
 	key_hashes[new_i] = key_hash;
 	bookmarks[new_i] = bookmark;
-	if(cache->entry_total >= entry_capacity) {
+	if(is_exceeding_load(cache->entry_total, cache->dead_total, entry_capacity)) {
 		grow_cache_size(cache);
 	}
 }

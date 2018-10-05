@@ -60,10 +60,10 @@ void set_last(DLL* list, Index item_i, Node* node, Evict_item_locator loc) {
 	last_node->next = next_i;
 	last_node->pre = pre_i;
 	if(pre_i != INVALID_NODE) {
-		 get_node(loc, pre_i)->next = last;
+		get_node(loc, pre_i)->next = last;
 	}
 	if(next_i != INVALID_NODE) {
-		 get_node(loc, next_i)->pre = last;
+		get_node(loc, next_i)->pre = last;
 	}
 
 	node->next = INVALID_NODE;
