@@ -73,16 +73,6 @@ void set_last(DLL* list, Index item_i, Node* node, Evict_item_locator loc) {
 		get_node(loc, pre_i1)->next = item_i;
 	}
 }
-void update(DLL* list, Index item_i, Node* node, Index new_i, Evict_item_locator loc) {
-	auto next_i = node->next;
-	auto pre_i = node->pre;
-	if(pre_i != INVALID_NODE) {
-		get_node(loc, pre_i)->next = new_i;
-	}
-	if(next_i != INVALID_NODE) {
-		get_node(loc, next_i)->pre = new_i;
-	}
-}
 
 
 void create_evictor(Evictor* evictor, evictor_type policy, Index init_capacity) {
@@ -205,21 +195,5 @@ void touch_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_loc
 		set_last(&evictor->data.list, item_i, node, loc);
 	} else {//RANDOM
 
-	}
-}
-
-void update_item(Evictor* evictor, Index item_i, Evict_item* item, Index new_i, Evict_item_locator loc) {//item was moved
-	auto policy = evictor->policy;
-	if(policy == FIFO) {
-		auto node = &item->node;
-		update(&evictor->data.list, item_i, node, new_i, loc);
-	} else if(policy == LRU) {
-		auto node = &item->node;
-		update(&evictor->data.list, item_i, node, new_i, loc);
-	} else {//RANDOM
-		//relink
-		auto data = &evictor->data.rand_data;
-		auto rand_items = data->rand_items;
-		rand_items[item->rand_i] = new_i;
 	}
 }

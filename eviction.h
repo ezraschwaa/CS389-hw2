@@ -2,6 +2,8 @@
 //By Monica Moniot
 #include "cache.h"
 
+using mem_unit = uint8_t;
+
 using Cache = cache_obj;
 using Key_ptr = key_type;
 using Value_ptr = val_type;
@@ -53,5 +55,3 @@ void add_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locat
 void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc);
 
 void touch_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc);
-
-void update_item(Evictor* evictor, Index item_i, Evict_item* item, Index new_i, Evict_item_locator loc);
