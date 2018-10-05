@@ -15,7 +15,6 @@ struct DLL {
 };
 
 struct Rand_data {
-	Index* rand_items;
 	Index total_items;
 };
 union Evictor_data {
@@ -43,14 +42,13 @@ struct Evict_item_locator {
 };
 
 
-void create_evictor(Evictor* evictor, evictor_type policy, Index size);
-void grow_evictor(Evictor* evictor, Index size);
-void delete_evictor(Evictor* evictor);
+void create_evictor(Evictor* evictor, evictor_type policy, void* mem_arena);
+constexpr Index get_mem_size_of_evictor(evictor_type policy, Index entry_capacity);
 
-Index evict_item(Evictor* evictor, Evict_item_locator loc);
+Index get_evict_item(Evictor* evictor, Evict_item_locator loc, void* mem_arena);//also removes item
 
-void add_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc);
+void add_evict_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc, void* mem_arena);
 
-void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc);
+void remove_evict_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc, void* mem_arena);
 
-void touch_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc);
+void touch_evict_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc, void* mem_arena);

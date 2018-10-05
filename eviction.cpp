@@ -1,4 +1,3 @@
-#pragma once
 //By Monica Moniot
 #include <stdlib.h>
 #include <cstring>
@@ -7,7 +6,7 @@
 
 
 inline Evict_item* get_evict_item(Evict_item_locator loc, Index item_i) {
-	return static_cast<Evict_item*>(loc.abs_first + item_i*loc.step_size);
+	return reinterpret_cast<Evict_item*>(static_cast<mem_unit*>(loc.abs_first) + item_i*loc.step_size);
 }
 
 
@@ -75,7 +74,7 @@ void set_last(DLL* list, Index item_i, Node* node, Evict_item_locator loc) {
 }
 
 
-void create_evictor(Evictor* evictor, evictor_type policy, Index init_capacity) {
+void create_evictor(Evictor* evictor, evictor_type policy, void* mem_arena) {
 	evictor->policy = policy;
 	if(policy == FIFO) {
 		auto list = &evictor->data.list;
@@ -86,40 +85,20 @@ void create_evictor(Evictor* evictor, evictor_type policy, Index init_capacity) 
 		list->last = INVALID_NODE;
 		list->first = INVALID_NODE;
 	} else {//RANDOM
-		auto rand_data = &evictor->data.rand_data;
-		rand_data->rand_items = new Index[init_capacity];
-		rand_data->total_items = 0;
+		evictor->data.rand_data.total_items = 0;
 	}
 }
-void grow_evictor(Evictor* evictor, Index pre_size, Index new_size) {
-	auto policy = evictor->policy;
+constexpr Index get_mem_size_of_evictor(evictor_type policy, Index entry_capacity) {
 	if(policy == FIFO) {
-
+		return 0;
 	} else if(policy == LRU) {
-
+		return 0;
 	} else {//RANDOM
-		auto data = &evictor->data.rand_data;
-		auto new_items = new Index[new_size];
-		memcpy(new_items, data->rand_items, pre_size);
-		delete data->rand_items;
-		data->rand_items = new_items;
-	}
-}
-void delete_evictor(Evictor* evictor) {
-	auto policy = evictor->policy;
-	if(policy == FIFO) {
-
-	} else if(policy == LRU) {
-
-	} else {//RANDOM
-		auto data = &evictor->data.rand_data;
-		delete data->rand_items;
-		data->rand_items = NULL;
-		data->total_items = 0;
+		return sizeof(Index)*entry_capacity;
 	}
 }
 
-Index evict_item(Evictor* evictor, Evict_item_locator loc) {//return item to evict
+Index evict_item(Evictor* evictor, Evict_item_locator loc, void* mem_arena) {//return item to evict
 	auto policy = evictor->policy;
 	Index item_i = 0;
 	if(policy == FIFO) {
@@ -132,7 +111,7 @@ Index evict_item(Evictor* evictor, Evict_item_locator loc) {//return item to evi
 		remove(list, item_i, get_node(loc, item_i), loc);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
-		auto rand_items = data->rand_items;
+		auto rand_items = static_cast<Index*>(mem_arena);
 		auto rand_i0 = rand()%data->total_items;
 		item_i = rand_items[rand_i0];
 		//We need to delete rand_i0 from rand_items in place
@@ -146,7 +125,7 @@ Index evict_item(Evictor* evictor, Evict_item_locator loc) {//return item to evi
 	return item_i;
 }
 
-void add_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc) {//item was created
+void add_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc, void* mem_arena) {//item was created
 	//we must init "item"
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
@@ -157,14 +136,14 @@ void add_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locat
 		append(&evictor->data.list, item_i, node, loc);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
-		auto rand_items = data->rand_items;
+		auto rand_items = static_cast<Index*>(mem_arena);
 		item->rand_i = data->total_items;
 		rand_items[data->total_items] = item_i;
 		data->total_items += 1;
 	}
 }
 
-void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc) {//item was removed
+void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc, void* mem_arena) {//item was removed
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
 		auto node = &item->node;
@@ -174,7 +153,7 @@ void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_lo
 		remove(&evictor->data.list, item_i, node, loc);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
-		auto rand_items = data->rand_items;
+		auto rand_items = static_cast<Index*>(mem_arena);
 		//We need to delete from rand_items in place
 		//this requires us to relink some data objects
 		Index rand_i0 = item->rand_i;
@@ -186,7 +165,7 @@ void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_lo
 	}
 }
 
-void touch_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc) {//item was touched
+void touch_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc, void* mem_arena) {//item was touched
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
 
