@@ -31,12 +31,12 @@ struct Evictor {
 
 
 void create_evictor(Evictor* evictor, evictor_type policy, Index size);
-void delete_evictor(Evictor evictor);
+void delete_evictor(Evictor* evictor);
 
-Index evict_item(Evictor evictor);
+Index evict_item(Evictor* evictor);
 
-Evict_pid add_item(Evictor evictor, Index pid);
+Evict_pid add_item(Evictor* evictor, Index pid);
 
-void remove_item(Evictor evictor, Evict_pid i);
+void remove_item(Evictor* evictor, Evict_pid i);
 
-void touch_item(Evictor evictor, Evict_pid i);
+void touch_item(Evictor* evictor, Evict_pid i);
