@@ -467,11 +467,11 @@ Mem_array serialize_cache(Cache* cache) {
 	memcpy(mem_arena_copy, &cache->mem_arena, mem_arena_size);
 
 	//replace all pointers with relative pointers
+	auto entry_book_copy = &cache_copy->entry_book;
 	cache_copy->mem_arena = NULL;
-	cache_copy->entry_book.pages = get_pages(mem_arena_copy, entry_capacity);
+	entry_book_copy->pages = get_pages(mem_arena_copy, entry_capacity);
 
 	auto keys_copy = get_keys(mem_arena_copy, entry_capacity);
-	auto entry_book_copy = &cache_copy->entry_book;
 
 	Index string_space_end = 0;
 	entries_left = entry_total;
@@ -480,7 +480,6 @@ Mem_array serialize_cache(Cache* cache) {
 		if(key != NULL and key != DELETED) {
 			entries_left -= 1;
 			auto bookmark = bookmarks[i];
-			Index key_hash = key_hashes[i];
 			{//copy key to string space
 				auto key_copy = &string_space[string_space_end];
 				auto key_size = find_key_size(key);
@@ -501,6 +500,7 @@ Mem_array serialize_cache(Cache* cache) {
 			}
 		}
 	}
+	entry_book_copy->pages = NULL;
 
 	// auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
 	// auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;

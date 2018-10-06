@@ -62,6 +62,11 @@ void inline remove_entry(Cache* cache, Index i) {
 	delete values[i];
 
 	delete keys[i];
+	//in place delete the entry
+	auto replace_i = cache->entry_size;
+	values[i] = values[replace_i];
+	value_sizes[i] = value_sizes[replace_i];
+	keys[i] = keys[replace_i];
 }
 
 
@@ -156,8 +161,6 @@ void cache_delete(Cache* cache, Key_ptr key) {
 	// auto values = cache->values;
 	// auto value_sizes = cache->value_sizes;
 	auto keys = cache->keys;
-	// auto const hash = cache->hash;
-	// auto const evictor = cache->evictor;
 	//check if key is in cache
 	for(Index i = 0; i < cache->entry_size; i += 1) {
 		Key_ptr cur_key = keys[i];
