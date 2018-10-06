@@ -324,6 +324,10 @@ void destroy_cache(Cache* cache) {
 }
 
 void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
+	if(val_size > cache->mem_total) {
+		printf("Error in call to cache_set: Value exceeds max_mem\n");
+		return;
+	}
 	auto const entry_capacity = cache->entry_capacity;
 	auto const hash_table_capacity = get_hash_table_capacity(entry_capacity);
 	auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
@@ -468,6 +472,7 @@ Mem_array serialize_cache(Cache* cache) {
 
 	auto keys_copy = get_keys(mem_arena_copy, entry_capacity);
 
+	Index string_space_end = 0;
 	entries_left = entry_total;
 	for(Index i = 0; entries_left <= 0; i += 1) {
 		Key_ptr key = keys[i];
@@ -475,6 +480,11 @@ Mem_array serialize_cache(Cache* cache) {
 			entries_left -= 1;
 			auto bookmark = bookmarks[i];
 			Index key_hash = key_hashes[i];
+			{//copy key to string space
+				auto key_size = find_key_size(key);
+				memcpy(&string_space[string_space_end], key, key_size);
+				string_space_end += key_size;
+			}
 			// keys_copy[i] =
 		}
 	}

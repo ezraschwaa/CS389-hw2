@@ -1,5 +1,6 @@
 //By Monica Moniot
 #include <stdlib.h>
+#include <stdio.h>
 #include <cstring>
 #include <cassert>
 #include <type_traits>
@@ -79,9 +80,15 @@ Cache* create_cache(Index max_mem, Evictor evictor, Hash_func hash) {
 }
 
 void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
-	assert(val_size > 0);
-	Index key_size = find_key_size(key);
 	auto const mem_capacity = cache->mem_capacity;
+	if(val_size > 0) {
+		printf("Error in call to cache_set: Zero length values are not allowed\n");
+		return;
+	} else if(val_size > mem_capacity) {
+		printf("Error in call to cache_set: Value exceeds max_mem\n");
+		return;
+	}
+	Index key_size = find_key_size(key);
 	auto values = cache->values;
 	auto value_sizes = cache->value_sizes;
 	auto keys = cache->keys;
