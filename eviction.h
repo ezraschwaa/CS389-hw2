@@ -1,13 +1,8 @@
-//By Monica Moniot
+//By Monica Moniot and Alyssa Riceman
+#pragma once
 #include "cache.h"
+#include "book.h"
 
-using mem_unit = uint8_t;//this must have the size of a unit of memory (a byte)
-
-using Cache = cache_obj;
-using Key_ptr = key_type;
-using Value_ptr = val_type;
-using Index = index_type;
-using Hash_func = hash_func;
 
 struct DLL {
 	Index last;
@@ -27,28 +22,22 @@ struct Evictor {
 	Evictor_data data;
 };
 
-struct Node {
-	Index next;
-	Index pre;
-};
-union Evict_item {
-	Index rand_i;
-	Node node;
-};
-
-struct Evict_item_locator {
-	void* abs_first;
-	Index step_size;
-};
-
 
 void create_evictor(Evictor* evictor, evictor_type policy, void* mem_arena);
-constexpr Index get_mem_size_of_evictor(evictor_type policy, Index entry_capacity);
+constexpr Index get_mem_size_of_evictor(evictor_type policy, Index entry_capacity){
+	if(policy == FIFO) {
+		return 0;
+	} else if(policy == LRU) {
+		return 0;
+	} else {//RANDOM
+		return sizeof(Index)*entry_capacity;
+	}
+}
 
-Index get_evict_item(Evictor* evictor, Evict_item_locator loc, void* mem_arena);//also removes item
+Index get_evict_item(Evictor* evictor, Book* book, void* mem_arena);//also removes item
 
-void add_evict_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc, void* mem_arena);
+void add_evict_item(Evictor* evictor, Index item_i, Evict_item* item, Book* book, void* mem_arena);
 
-void remove_evict_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc, void* mem_arena);
+void remove_evict_item(Evictor* evictor, Index item_i, Evict_item* item, Book* book, void* mem_arena);
 
-void touch_evict_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc, void* mem_arena);
+void touch_evict_item(Evictor* evictor, Index item_i, Evict_item* item, Book* book, void* mem_arena);

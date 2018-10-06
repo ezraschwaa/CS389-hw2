@@ -1,9 +1,10 @@
-//By Monica Moniot
+//By Monica Moniot and Alyssa Riceman
 #include <stdlib.h>
 #include <stdio.h>
 #include <cstring>
 #include "cache.h"
 #include "eviction.h"
+#include "book.h"
 
 
 constexpr Index TOTAL_STEPS = 8;
@@ -17,29 +18,6 @@ inline constexpr Index get_step_size(Index key_hash, Index hash_table_capacity) 
 	return n*(hash_table_capacity/TOTAL_STEPS) + 1;
 }
 
-
-struct Entry {
-	Index cur_i;
-	mem_unit* value;
-	Index value_size;
-	Evict_item evict_item;
-};
-
-//Book is a data structure for allocating memory of a fixed size in constant time
-//Page is the unit of fixed size memory that book allocates
-//Bookmark is a relative pointer to a page in book
-//Page_data defines the type and size of memory that book allocates
-using Bookmark = Index;
-using Page_data = Entry;
-union Page {
-	Bookmark next;
-	Page_data data;
-};
-struct Book {
-	Page* pages;
-	Bookmark end;
-	Bookmark first_unused;
-};
 
 struct cache_obj {//Definition of Cache
 	Index mem_capacity;
@@ -70,41 +48,6 @@ inline constexpr bool is_exceeding_load(Index entry_total, Index dead_total, Ind
 }
 
 
-constexpr Bookmark INVALID_PAGE = -1;
-inline void create_book(Book* book, Page* pages, Bookmark size) {
-	book->first_unused = INVALID_PAGE;
-	book->end = 0;
-	book->pages = pages;
-}
-inline void delete_book(Book* book) {
-	book->pages = NULL;
-}
-inline void copy_book(Book* book, Page* new_pages, Bookmark pre_size) {
-	memcpy(new_pages, book->pages, pre_size);
-	book->pages = new_pages;
-}
-inline Bookmark alloc_book_page(Book* book) {
-	auto pages = book->pages;
-	auto bookmark = book->first_unused;
-	if(bookmark == INVALID_PAGE) {
-		bookmark = book->end;
-		book->end += 1;
-	} else {
-		book->first_unused = pages[bookmark].next;
-	}
-	return bookmark;
-}
-inline void free_book_page(Book* book, Bookmark bookmark) {
-	auto pages = book->pages;
-	auto page = &pages[bookmark];
-	page->next = book->first_unused;
-	book->first_unused = bookmark;
-}
-inline Page_data* read_book(Book* book, Bookmark bookmark) {
-	return &book->pages[bookmark].data;
-}
-
-
 constexpr char NULL_TERMINATOR = 0;
 Index find_key_size(Key_ptr key) {//Includes the null terminator in the size
 	Index size = 0;
@@ -129,12 +72,6 @@ bool are_keys_equal(Key_ptr key0, Key_ptr key1) {//must be null terminated
 }
 
 
-inline Evict_item_locator get_locator(Cache* cache) {
-	Evict_item_locator loc;
-	loc.abs_first = static_cast<void*>(&read_book(&cache->entry_book, 0)->evict_item);
-	loc.step_size = sizeof(Page);
-	return loc;
-}
 inline constexpr Index* get_bookmarks(mem_unit* mem_arena, Index entry_capacity) {
 	return reinterpret_cast<Index*>(mem_arena);
 }
@@ -211,7 +148,7 @@ inline void remove_entry(Cache* cache, Index i) {//all entries get removed throu
 	delete keys[i];
 	keys[i] = DELETED;
 	cache->dead_total += 1;
-	remove_evict_item(evictor, bookmark, &entry->evict_item, get_locator(cache), evict_data);
+	remove_evict_item(evictor, bookmark, &entry->evict_item, entry_book, evict_data);
 	free_book_page(entry_book, bookmark);
 }
 inline void remove_entry_from_bookmark(Cache* cache, Index bookmark) {
@@ -222,10 +159,11 @@ inline void remove_entry_from_bookmark(Cache* cache, Index bookmark) {
 
 inline void update_mem_size(Cache* cache, Index mem_change) {
 	auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
+	auto entry_book = &cache->entry_book;
 	auto const evictor = &cache->evictor;
 	cache->mem_total += mem_change;
 	while(cache->mem_total > cache->mem_capacity) {//Evict
-		Index bookmark = get_evict_item(evictor, get_locator(cache), evict_data);
+		Index bookmark = get_evict_item(evictor, entry_book, evict_data);
 		remove_entry_from_bookmark(cache, bookmark);
 	}
 }
@@ -358,7 +296,7 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 				//add new value
 				entry->value = val_copy;
 				entry->value_size = val_size;
-				touch_evict_item(evictor, expected_i, &entry->evict_item, get_locator(cache), evict_data);
+				touch_evict_item(evictor, expected_i, &entry->evict_item, entry_book, evict_data);
 				return;
 			}
 		}
@@ -383,7 +321,7 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 	entry->cur_i = new_i;
 	entry->value = val_copy;
 	entry->value_size = val_size;
-	add_evict_item(evictor, bookmark, &entry->evict_item, get_locator(cache), evict_data);
+	add_evict_item(evictor, bookmark, &entry->evict_item, entry_book, evict_data);
 
 	keys[new_i] = key_copy;
 	key_hashes[new_i] = key_hash;
@@ -405,7 +343,7 @@ Value_ptr cache_get(Cache* cache, Key_ptr key, Index* val_size) {
 	} else {
 		auto bookmark = bookmarks[i];
 		Entry* entry = read_book(entry_book, bookmark);
-		touch_evict_item(evictor, bookmark, &entry->evict_item, get_locator(cache), evict_data);
+		touch_evict_item(evictor, bookmark, &entry->evict_item, entry_book, evict_data);
 		return static_cast<Value_ptr>(entry->value);
 	}
 }

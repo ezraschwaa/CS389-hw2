@@ -1,28 +1,29 @@
-//By Monica Moniot
+//By Monica Moniot and Alyssa Riceman
 #include <stdlib.h>
 #include <cstring>
 #include <cassert>
 #include "eviction.h"
+#include "book.h"
 
 
-inline Evict_item* get_evict_item(Evict_item_locator loc, Index item_i) {
-	return reinterpret_cast<Evict_item*>(static_cast<mem_unit*>(loc.abs_first) + item_i*loc.step_size);
+inline Evict_item* get_evict_item(Book* book, Index item_i) {
+	return &read_book(book, item_i)->evict_item;
 }
 
 
 Index INVALID_NODE = -1;
-Node* get_node(Evict_item_locator loc, Index item_i) {
-	return &get_evict_item(loc, item_i)->node;
+Node* get_node(Book* book, Index item_i) {
+	return &get_evict_item(book, item_i)->node;
 }
-void remove(DLL* list, Index item_i, Node* node, Evict_item_locator loc) {
+void remove(DLL* list, Index item_i, Node* node, Book* book) {
 	auto next_i = node->next;
 	auto pre_i = node->pre;
 
 	if(pre_i != INVALID_NODE) {
-		get_node(loc, pre_i)->next = next_i;
+		get_node(book, pre_i)->next = next_i;
 	}
 	if(next_i != INVALID_NODE) {
-		get_node(loc, next_i)->pre = pre_i;
+		get_node(book, next_i)->pre = pre_i;
 	}
 
 	if(list->first == item_i) {
@@ -32,19 +33,19 @@ void remove(DLL* list, Index item_i, Node* node, Evict_item_locator loc) {
 		list->last = pre_i;
 	}
 }
-void append(DLL* list, Index item_i, Node* node, Evict_item_locator loc) {
+void append(DLL* list, Index item_i, Node* node, Book* book) {
 	Index last = list->last;
 	if(last == INVALID_NODE) {
 		list->first = item_i;
 	} else {
-		Node* last_node = get_node(loc, last);
+		Node* last_node = get_node(book, last);
 		last_node->next = item_i;
 	}
 	node->pre = last;
 	node->next = INVALID_NODE;
 	list->last = item_i;
 }
-void set_last(DLL* list, Index item_i, Node* node, Evict_item_locator loc) {
+void set_last(DLL* list, Index item_i, Node* node, Book* book) {
 	auto last = list->first;
 	if(last == list->first or item_i == list->last) {
 		return;
@@ -52,7 +53,7 @@ void set_last(DLL* list, Index item_i, Node* node, Evict_item_locator loc) {
 		list->first = last;
 	}
 
-	auto last_node = get_node(loc, last);
+	auto last_node = get_node(book, last);
 	auto next_i = node->next;
 	auto pre_i = node->pre;
 	auto pre_i1 = last_node->pre;
@@ -60,16 +61,16 @@ void set_last(DLL* list, Index item_i, Node* node, Evict_item_locator loc) {
 	last_node->next = next_i;
 	last_node->pre = pre_i;
 	if(pre_i != INVALID_NODE) {
-		get_node(loc, pre_i)->next = last;
+		get_node(book, pre_i)->next = last;
 	}
 	if(next_i != INVALID_NODE) {
-		get_node(loc, next_i)->pre = last;
+		get_node(book, next_i)->pre = last;
 	}
 
 	node->next = INVALID_NODE;
 	node->pre = pre_i1;
 	if(pre_i1 != INVALID_NODE) {
-		get_node(loc, pre_i1)->next = item_i;
+		get_node(book, pre_i1)->next = item_i;
 	}
 }
 
@@ -88,27 +89,18 @@ void create_evictor(Evictor* evictor, evictor_type policy, void* mem_arena) {
 		evictor->data.rand_data.total_items = 0;
 	}
 }
-constexpr Index get_mem_size_of_evictor(evictor_type policy, Index entry_capacity) {
-	if(policy == FIFO) {
-		return 0;
-	} else if(policy == LRU) {
-		return 0;
-	} else {//RANDOM
-		return sizeof(Index)*entry_capacity;
-	}
-}
 
-Index evict_item(Evictor* evictor, Evict_item_locator loc, void* mem_arena) {//return item to evict
+Index evict_item(Evictor* evictor, Book* book, void* mem_arena) {//return item to evict
 	auto policy = evictor->policy;
 	Index item_i = 0;
 	if(policy == FIFO) {
 		auto list = &evictor->data.list;
 		item_i = list->first;
-		remove(list, item_i, get_node(loc, item_i), loc);
+		remove(list, item_i, get_node(book, item_i), book);
 	} else if(policy == LRU) {
 		auto list = &evictor->data.list;
 		item_i = list->first;
-		remove(list, item_i, get_node(loc, item_i), loc);
+		remove(list, item_i, get_node(book, item_i), book);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
 		auto rand_items = static_cast<Index*>(mem_arena);
@@ -118,22 +110,22 @@ Index evict_item(Evictor* evictor, Evict_item_locator loc, void* mem_arena) {//r
 		//this requires us to relink some data objects
 		auto rand_i1 = data->total_items - 1;
 		data->total_items = rand_i1;
-		auto item_i1 = get_evict_item(loc, rand_items[rand_i1]);
+		auto item_i1 = get_evict_item(book, rand_items[rand_i1]);
 		rand_items[rand_i0] = rand_items[rand_i1];
 		item_i1->rand_i = rand_i0;
 	}
 	return item_i;
 }
 
-void add_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc, void* mem_arena) {//item was created
+void add_item(Evictor* evictor, Index item_i, Evict_item* item, Book* book, void* mem_arena) {//item was created
 	//we must init "item"
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
 		auto node = &item->node;
-		append(&evictor->data.list, item_i, node, loc);
+		append(&evictor->data.list, item_i, node, book);
 	} else if(policy == LRU) {
 		auto node = &item->node;
-		append(&evictor->data.list, item_i, node, loc);
+		append(&evictor->data.list, item_i, node, book);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
 		auto rand_items = static_cast<Index*>(mem_arena);
@@ -143,14 +135,14 @@ void add_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locat
 	}
 }
 
-void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc, void* mem_arena) {//item was removed
+void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Book* book, void* mem_arena) {//item was removed
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
 		auto node = &item->node;
-		remove(&evictor->data.list, item_i, node, loc);
+		remove(&evictor->data.list, item_i, node, book);
 	} else if(policy == LRU) {
 		auto node = &item->node;
-		remove(&evictor->data.list, item_i, node, loc);
+		remove(&evictor->data.list, item_i, node, book);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
 		auto rand_items = static_cast<Index*>(mem_arena);
@@ -159,19 +151,19 @@ void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_lo
 		Index rand_i0 = item->rand_i;
 		auto rand_i1 = data->total_items - 1;
 		data->total_items = rand_i1;
-		auto item_i1 = get_evict_item(loc, rand_items[rand_i1]);
+		auto item_i1 = get_evict_item(book, rand_items[rand_i1]);
 		rand_items[rand_i0] = rand_items[rand_i1];
 		item_i1->rand_i = rand_i0;
 	}
 }
 
-void touch_item(Evictor* evictor, Index item_i, Evict_item* item, Evict_item_locator loc, void* mem_arena) {//item was touched
+void touch_item(Evictor* evictor, Index item_i, Evict_item* item, Book* book, void* mem_arena) {//item was touched
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
 
 	} else if(policy == LRU) {
 		auto node = &item->node;
-		set_last(&evictor->data.list, item_i, node, loc);
+		set_last(&evictor->data.list, item_i, node, book);
 	} else {//RANDOM
 
 	}

@@ -1,4 +1,4 @@
-//By Monica Moniot
+//By Monica Moniot and Alyssa Riceman
 #include <stdlib.h>
 #include <stdio.h>
 #include <cstring>
