@@ -150,22 +150,22 @@ inline constexpr Key_ptr* get_keys(mem_unit* mem_arena, Index entry_capacity) {
 }
 inline constexpr Page* get_pages(mem_unit* mem_arena, Index entry_capacity) {
 	auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	auto size_of_hash_table = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
-	return reinterpret_cast<Page*>(mem_arena + size_of_hash_table);
+	auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
+	return reinterpret_cast<Page*>(mem_arena + hash_table_size);
 }
 inline constexpr void* get_evict_data(mem_unit* mem_arena, Index entry_capacity) {
 	auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	auto size_of_hash_table = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
-	auto size_of_book = sizeof(Page)*entry_capacity;
-	return reinterpret_cast<void*>(mem_arena + size_of_hash_table + size_of_book);
+	auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
+	auto book_size = sizeof(Page)*entry_capacity;
+	return reinterpret_cast<void*>(mem_arena + hash_table_size + book_size);
 }
 
 inline mem_unit* allocate(Index entry_capacity, evictor_type policy) {
 	auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	auto size_of_hash_table = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
-	auto size_of_book = sizeof(Page)*entry_capacity;
-	auto size_of_evictor = get_mem_size_of_evictor(policy, entry_capacity);
-	return new mem_unit[size_of_hash_table + size_of_book + size_of_evictor];
+	auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
+	auto book_size = sizeof(Page)*entry_capacity;
+	auto evictor_size = get_mem_size_of_evictor(policy, entry_capacity);
+	return new mem_unit[hash_table_size + book_size + evictor_size];
 }
 
 constexpr Key_ptr DELETED = &static_cast<Key_ptr>(NULL)[1];//stupid way of getting an invalid address as a constant
@@ -404,7 +404,7 @@ Value_ptr cache_get(Cache* cache, Key_ptr key, Index* val_size) {
 		auto bookmark = bookmarks[i];
 		Entry* entry = read_book(entry_book, bookmark);
 		touch_evict_item(evictor, bookmark, &entry->evict_item, get_locator(cache), evict_data);
-		return entry->value;
+		return static_cast<Value_ptr>(entry->value);
 	}
 }
 
@@ -427,13 +427,13 @@ Mem_array serialize_cache(Cache* cache) {
 	auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
 	auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
 	//pages
-	auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
-	auto entry_book = &cache->entry_book;
+	// auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
+	// auto entry_book = &cache->entry_book;
 	auto const evictor = &cache->evictor;
 
-	Mem_array ret;
-	// ret.data;//--<--
-	// ret.size;//--<--
+	auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
+	auto book_size = sizeof(Page)*entry_capacity;
+	auto evictor_size = get_mem_size_of_evictor(evictor->policy, entry_capacity);
 
 	auto key_mem_size = 0;
 	auto value_mem_size = cache->mem_total;
@@ -444,17 +444,44 @@ Mem_array serialize_cache(Cache* cache) {
 		Key_ptr key = keys[i];
 		if(key != NULL and key != DELETED) {
 			entries_left -= 1;
-			auto key_hash = key_hashes[i];
-			auto bookmark = bookmarks[i];
 			key_mem_size += find_key_size(key);
 		}
 	}
-	// auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	// auto size_of_hash_table = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
-	auto size_of_book = sizeof(Page)*entry_capacity;
-	auto size_of_evictor = get_mem_size_of_evictor(evictor->policy, entry_capacity);
 
-	Index total_size = sizeof(Cache);
+	auto mem_arena_size = hash_table_size + book_size + evictor_size;
+	auto string_space_size = key_mem_size + value_mem_size;
+
+	Mem_array ret;
+	ret.size = sizeof(Cache) + mem_arena_size + string_space_size;
+	ret.data = new mem_unit[ret.size];
+	mem_unit* mem_cache = static_cast<mem_unit*>(ret.data);
+	Cache* cache_copy = static_cast<Cache*>(ret.data);
+	mem_unit* mem_arena_copy = mem_cache + sizeof(Cache);
+	mem_unit* string_space = mem_cache + sizeof(Cache) + mem_arena_size;
+
+	memcpy(mem_cache, cache, sizeof(Cache));
+	memcpy(mem_arena_copy, &cache->mem_arena, mem_arena_size);
+
+	//replace all pointers with relative pointers
+	cache_copy->mem_arena = NULL;
+	cache_copy->entry_book.pages = NULL;
+
+	auto keys_copy = get_keys(mem_arena_copy, entry_capacity);
+
+	entries_left = entry_total;
+	for(Index i = 0; entries_left <= 0; i += 1) {
+		Key_ptr key = keys[i];
+		if(key != NULL and key != DELETED) {
+			entries_left -= 1;
+			auto bookmark = bookmarks[i];
+			Index key_hash = key_hashes[i];
+			// keys_copy[i] =
+		}
+	}
+
+	// auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
+	// auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
+	return ret;
 }
 
 cache_type deserialize_cache(Mem_array arr) {
