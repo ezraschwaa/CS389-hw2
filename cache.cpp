@@ -51,6 +51,27 @@ struct cache_obj {//Definition of Cache
 };
 
 
+inline constexpr Index get_hash_table_capacity(Index entry_capacity) {
+	//let e = INIT_ENTRY_CAPACITY
+	//let h = INIT_HASH_TABLE_CAPACITY
+	//assert entry_capacity/e == hash_table_capacity/h
+	//so h*entry_capacity/e == h*(hash_table_capacity/h)
+	//so h*entry_capacity/e == (h*hash_table_capacity)/h
+	//so h*entry_capacity/e == hash_table_capacity
+	return INIT_HASH_TABLE_CAPACITY*(entry_capacity/INIT_ENTRY_CAPACITY);
+}
+inline constexpr bool is_exceeding_load(Index entry_total, Index dead_total, Index entry_capacity) {
+	bool is_exceed_entry = entry_total >= entry_capacity;
+	bool is_exceed_load_factor = entry_total + dead_total >= LOAD_FACTOR*get_hash_table_capacity(entry_capacity);
+	return is_exceed_entry or is_exceed_load_factor;
+}
+constexpr Index TOTAL_STEPS = 8;//must be power of 2
+inline constexpr Index get_step_size(Index key_hash, Index hash_table_capacity) {
+	Index n = key_hash%TOTAL_STEPS;
+	return n*(hash_table_capacity/TOTAL_STEPS) + 1;
+}
+
+
 constexpr Bookmark INVALID_PAGE = -1;
 inline void create_book(Book* book, Page* pages, Bookmark size) {
 	book->first_unused = INVALID_PAGE;
@@ -83,27 +104,6 @@ inline void free_book_page(Book* book, Bookmark bookmark) {
 }
 inline Page_data* read_book(Book* book, Bookmark bookmark) {
 	return &book->pages[bookmark].data;
-}
-
-
-inline constexpr Index get_hash_table_capacity(Index entry_capacity) {
-	//let e = INIT_ENTRY_CAPACITY
-	//let h = INIT_HASH_TABLE_CAPACITY
-	//assert entry_capacity/e == hash_table_capacity/h
-	//so h*entry_capacity/e == h*(hash_table_capacity/h)
-	//so h*entry_capacity/e == (h*hash_table_capacity)/h
-	//so h*entry_capacity/e == hash_table_capacity
-	return INIT_HASH_TABLE_CAPACITY*(entry_capacity/INIT_ENTRY_CAPACITY);
-}
-inline constexpr bool is_exceeding_load(Index entry_total, Index dead_total, Index entry_capacity) {
-	bool is_exceed_entry = entry_total >= entry_capacity;
-	bool is_exceed_load_factor = entry_total + dead_total >= LOAD_FACTOR*get_hash_table_capacity(entry_capacity);
-	return is_exceed_entry or is_exceed_load_factor;
-}
-constexpr Index TOTAL_STEPS = 8;//must be power of 2
-inline constexpr Index get_step_size(Index key_hash, Index hash_table_capacity) {
-	Index n = key_hash%TOTAL_STEPS;
-	return n*(hash_table_capacity/TOTAL_STEPS) + 1;
 }
 
 
@@ -162,10 +162,10 @@ inline constexpr void* get_evict_data(mem_unit* mem_arena, Index entry_capacity)
 
 inline mem_unit* allocate(Index entry_capacity, evictor_type policy) {
 	auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	auto size_of_cache_data = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
+	auto size_of_hash_table = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
 	auto size_of_book = sizeof(Page)*entry_capacity;
 	auto size_of_evictor = get_mem_size_of_evictor(policy, entry_capacity);
-	return new mem_unit[size_of_cache_data + size_of_book + size_of_evictor];
+	return new mem_unit[size_of_hash_table + size_of_book + size_of_evictor];
 }
 
 constexpr Key_ptr DELETED = &static_cast<Key_ptr>(NULL)[1];//stupid way of getting an invalid address as a constant
@@ -417,4 +417,46 @@ void cache_delete(Cache* cache, Key_ptr key) {
 
 Index cache_space_used(Cache* cache) {
 	return cache->mem_total;
+}
+
+
+Mem_array serialize_cache(Cache* cache) {
+	auto const entry_capacity = cache->entry_capacity;
+	auto const hash_table_capacity = get_hash_table_capacity(entry_capacity);
+	auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
+	auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
+	auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
+	//pages
+	auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
+	auto entry_book = &cache->entry_book;
+	auto const evictor = &cache->evictor;
+
+	Mem_array ret;
+	// ret.data;//--<--
+	// ret.size;//--<--
+
+	auto key_mem_size = 0;
+	auto value_mem_size = cache->mem_total;
+	auto entry_total = cache->entry_total;
+
+	auto entries_left = entry_total;
+	for(Index i = 0; entries_left <= 0; i += 1) {
+		Key_ptr key = keys[i];
+		if(key != NULL and key != DELETED) {
+			entries_left -= 1;
+			auto key_hash = key_hashes[i];
+			auto bookmark = bookmarks[i];
+			key_mem_size += find_key_size(key);
+		}
+	}
+	// auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
+	// auto size_of_hash_table = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
+	auto size_of_book = sizeof(Page)*entry_capacity;
+	auto size_of_evictor = get_mem_size_of_evictor(evictor->policy, entry_capacity);
+
+	Index total_size = sizeof(Cache);
+}
+
+cache_type deserialize_cache(Mem_array arr) {
+
 }

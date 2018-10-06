@@ -51,3 +51,13 @@ index_type cache_space_used(cache_type cache);
 
 // Destroy all resource connected to a cache object
 void destroy_cache(cache_type cache);
+
+
+//start of unofficial interface
+struct Mem_array {
+	void* data;
+	index_type size;
+};
+Mem_array serialize_cache(cache_type cache);
+
+cache_type deserialize_cache(Mem_array arr);
