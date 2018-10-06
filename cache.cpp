@@ -457,7 +457,8 @@ Mem_array serialize_cache(Cache* cache) {
 
 	Mem_array ret;
 	ret.size = sizeof(Cache) + mem_arena_size + string_space_size;
-	ret.data = new mem_unit[ret.size];
+	ret.data = new mem_unit[ret.size];//--allocation here
+
 	mem_unit* mem_cache = static_cast<mem_unit*>(ret.data);
 	Cache* cache_copy = static_cast<Cache*>(ret.data);
 	mem_unit* mem_arena_copy = mem_cache + sizeof(Cache);
