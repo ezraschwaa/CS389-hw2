@@ -4,14 +4,15 @@
 #include <cassert>
 #include "eviction.h"
 #include "book.h"
+#include "types.h"
+
+constexpr Index INVALID_NODE = -1;
 
 
 inline Evict_item* get_evict_item(Book* book, Index item_i) {
 	return &read_book(book, item_i)->evict_item;
 }
 
-
-Index INVALID_NODE = -1;
 Node* get_node(Book* book, Index item_i) {
 	return &get_evict_item(book, item_i)->node;
 }

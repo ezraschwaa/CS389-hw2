@@ -5,59 +5,34 @@
 #include "cache.h"
 #include "eviction.h"
 #include "book.h"
-
+#include "types.h"
 
 constexpr Index TOTAL_STEPS = 8;
 constexpr Index INIT_ENTRY_CAPACITY = 128;//must be divisible by TOTAL_STEPS
 constexpr double LOAD_FACTOR = .5;
 constexpr Index INIT_HASH_TABLE_CAPACITY = static_cast<Index>(INIT_ENTRY_CAPACITY/LOAD_FACTOR);
 
-inline constexpr Index get_step_size(Index key_hash, Index hash_table_capacity) {
+constexpr inline Index get_step_size(Index key_hash, Index hash_table_capacity) {
 	//gets the step size for traversing the hash table
 	Index n = key_hash%TOTAL_STEPS;
 	return n*(hash_table_capacity/TOTAL_STEPS) + 1;
 }
 
 
-struct cache_obj {//Definition of Cache
-	Index mem_capacity;
-	Index mem_total;
-	Index entry_capacity;
-	Index entry_total;
-	Index dead_total;//records deleted entries
-	mem_unit* mem_arena;//joint allocation of: {hash_table {Bookmark* bookmarks, Index* key_hashes, Key_ptr keys}, Page* pages, void* evict_data}; these fields have functions for retrieving them
-	Book entry_book;
-	Hash_func hash;
-	Evictor evictor;
-};
-
-
-inline constexpr Index get_hash_table_capacity(Index entry_capacity) {
-	//let e = INIT_ENTRY_CAPACITY
-	//let h = INIT_HASH_TABLE_CAPACITY
-	//assert entry_capacity/e == hash_table_capacity/h
-	//so h*entry_capacity/e == h*(hash_table_capacity/h)
-	//so h*entry_capacity/e == (h*hash_table_capacity)/h
-	//so h*entry_capacity/e == hash_table_capacity
-	return INIT_HASH_TABLE_CAPACITY*(entry_capacity/INIT_ENTRY_CAPACITY);
-}
-inline constexpr bool is_exceeding_load(Index entry_total, Index dead_total, Index entry_capacity) {
-	bool is_exceed_entry = entry_total >= entry_capacity;
-	bool is_exceed_load_factor = entry_total + dead_total >= LOAD_FACTOR*get_hash_table_capacity(entry_capacity);
-	return is_exceed_entry or is_exceed_load_factor;
-}
-
-
 constexpr char NULL_TERMINATOR = 0;
-Index find_key_size(Key_ptr key) {//Includes the null terminator in the size
+constexpr Key_ptr DELETED = &static_cast<Key_ptr>(NULL)[1];//stupid way of getting an invalid address as a constant
+constexpr Index KEY_NOT_FOUND = -1;
+
+Index find_key_size(const Key_ptr key) {
+	//Always returns the size in mem_units, Includes the null terminator in the size
 	Index size = 0;
 	while(key[size] != NULL_TERMINATOR) {
 		size += 1;
 	}
 	size += 1;
-	return size;
+	return size;//must be in mem_units
 }
-bool are_keys_equal(Key_ptr key0, Key_ptr key1) {//must be null terminated
+bool are_keys_equal(const Key_ptr key0, const Key_ptr key1) {//must be null terminated strings
 	Index i = 0;
 	while(true) {
 		auto c0 = key0[i];
@@ -72,45 +47,58 @@ bool are_keys_equal(Key_ptr key0, Key_ptr key1) {//must be null terminated
 }
 
 
-inline constexpr Index* get_bookmarks(mem_unit* mem_arena, Index entry_capacity) {
+constexpr inline Index get_hash_table_capacity(Index entry_capacity) {
+	//let e = INIT_ENTRY_CAPACITY
+	//let h = INIT_HASH_TABLE_CAPACITY
+	//assert entry_capacity/e == hash_table_capacity/h
+	//so h*entry_capacity/e == h*(hash_table_capacity/h)
+	//so h*entry_capacity/e == (h*hash_table_capacity)/h
+	//so h*entry_capacity/e == hash_table_capacity
+	return INIT_HASH_TABLE_CAPACITY*(entry_capacity/INIT_ENTRY_CAPACITY);
+}
+constexpr inline bool is_exceeding_load(Index entry_total, Index dead_total, Index entry_capacity) {
+	bool is_exceed_entry = entry_total >= entry_capacity;
+	bool is_exceed_load_factor = entry_total + dead_total >= LOAD_FACTOR*get_hash_table_capacity(entry_capacity);
+	return is_exceed_entry or is_exceed_load_factor;
+}
+
+constexpr inline Index* get_bookmarks(mem_unit* mem_arena, Index entry_capacity) {
 	return reinterpret_cast<Index*>(mem_arena);
 }
-inline constexpr Index* get_hashes(mem_unit* mem_arena, Index entry_capacity) {
-	auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
+constexpr inline Index* get_hashes(mem_unit* mem_arena, Index entry_capacity) {
+	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
 	return reinterpret_cast<Index*>(mem_arena + sizeof(Index)*hash_table_capacity);
 }
-inline constexpr Key_ptr* get_keys(mem_unit* mem_arena, Index entry_capacity) {
-	auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
+constexpr inline Key_ptr* get_keys(mem_unit* mem_arena, Index entry_capacity) {
+	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
 	return reinterpret_cast<Key_ptr*>(mem_arena + 2*sizeof(Index)*hash_table_capacity);
 }
-inline constexpr Page* get_pages(mem_unit* mem_arena, Index entry_capacity) {
-	auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
+constexpr inline Page* get_pages(mem_unit* mem_arena, Index entry_capacity) {
+	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
+	const auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
 	return reinterpret_cast<Page*>(mem_arena + hash_table_size);
 }
-inline constexpr void* get_evict_data(mem_unit* mem_arena, Index entry_capacity) {
-	auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
-	auto book_size = sizeof(Page)*entry_capacity;
+constexpr inline void* get_evict_data(mem_unit* mem_arena, Index entry_capacity) {
+	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
+	const auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
+	const auto book_size = sizeof(Page)*entry_capacity;
 	return reinterpret_cast<void*>(mem_arena + hash_table_size + book_size);
 }
 
 inline mem_unit* allocate(Index entry_capacity, evictor_type policy) {
-	auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
-	auto book_size = sizeof(Page)*entry_capacity;
-	auto evictor_size = get_mem_size_of_evictor(policy, entry_capacity);
+	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
+	const auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
+	const auto book_size = sizeof(Page)*entry_capacity;
+	const auto evictor_size = get_mem_size_of_evictor(policy, entry_capacity);
 	return new mem_unit[hash_table_size + book_size + evictor_size];
 }
 
-constexpr Key_ptr DELETED = &static_cast<Key_ptr>(NULL)[1];//stupid way of getting an invalid address as a constant
-constexpr Index KEY_NOT_FOUND = -1;
 
-inline Index find_key(Cache* cache, Key_ptr key) {
-	auto const hash_table_capacity = get_hash_table_capacity(cache->entry_capacity);
-	auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
-	auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
-	auto const key_hash = cache->hash(key);
+inline Index find_key(const Cache* cache, const Key_ptr key) {
+	const auto hash_table_capacity = get_hash_table_capacity(cache->entry_capacity);
+	const auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
+	const auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
+	const auto key_hash = cache->hash(key);
 	//check if key is in cache
 	Index expected_i = key_hash%hash_table_capacity;
 	Index step_size = get_step_size(key_hash, hash_table_capacity);
@@ -130,12 +118,12 @@ inline Index find_key(Cache* cache, Key_ptr key) {
 	return KEY_NOT_FOUND;
 }
 
-inline void remove_entry(Cache* cache, Index i) {//all entries get removed through here
-	auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
-	auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
-	auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
-	auto entry_book = &cache->entry_book;
-	auto const evictor = &cache->evictor;
+inline void remove_entry(Cache* cache, Index i) {//this is the only code that removes entries
+	const auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
+	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
+	const auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
+	const auto entry_book = &cache->entry_book;
+	const auto evictor = &cache->evictor;
 
 	auto bookmark = bookmarks[i];
 	Entry* entry = read_book(entry_book, bookmark);
@@ -152,41 +140,40 @@ inline void remove_entry(Cache* cache, Index i) {//all entries get removed throu
 	free_book_page(entry_book, bookmark);
 }
 inline void remove_entry_from_bookmark(Cache* cache, Index bookmark) {
-	auto entry_book = &cache->entry_book;
+	const auto entry_book = &cache->entry_book;
 	Entry* entry = read_book(entry_book, bookmark);
 	remove_entry(cache, entry->cur_i);
 }
 
 inline void update_mem_size(Cache* cache, Index mem_change) {
-	auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
-	auto entry_book = &cache->entry_book;
-	auto const evictor = &cache->evictor;
+	const auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
+	const auto entry_book = &cache->entry_book;
+	const auto evictor = &cache->evictor;
 	cache->mem_total += mem_change;
 	while(cache->mem_total > cache->mem_capacity) {//Evict
 		Index bookmark = get_evict_item(evictor, entry_book, evict_data);
 		remove_entry_from_bookmark(cache, bookmark);
 	}
 }
-
 inline void grow_cache_size(Cache* cache) {
 	//assert entry_capacity/INITIAL_BOOK_CAPACITY == hash_table_capacity/INIT_ENTRY_CAPACITY
-	auto const pre_capacity = cache->entry_capacity;
-	auto const new_capacity = 2*pre_capacity;
+	const auto pre_capacity = cache->entry_capacity;
+	const auto new_capacity = 2*pre_capacity;
 	cache->entry_capacity = new_capacity;
 
-	auto pre_mem_arena = cache->mem_arena;
-	auto pre_keys = get_keys(cache->mem_arena, cache->entry_capacity);
-	auto pre_key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
-	auto pre_bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
-	auto entry_book = &cache->entry_book;
+	const auto pre_mem_arena = cache->mem_arena;
+	const auto pre_keys = get_keys(cache->mem_arena, cache->entry_capacity);
+	const auto pre_key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
+	const auto pre_bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
+	const auto entry_book = &cache->entry_book;
 
 	auto mem_arena = allocate(new_capacity, cache->evictor.policy);
 	cache->mem_arena = mem_arena;
 	copy_book(&cache->entry_book, get_pages(cache->mem_arena, cache->entry_capacity), pre_capacity);
 
-	auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
-	auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
-	auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
+	const auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
+	const auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
+	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
 
 	auto entries_left = cache->entry_total;
 	for(Index i = 0; entries_left <= 0; i += 1) {
@@ -220,7 +207,8 @@ inline void grow_cache_size(Cache* cache) {
 }
 
 
-Cache* create_cache(Index max_mem, evictor_type policy, Hash_func hash) {
+
+Cache* create_cache(const Index max_mem, const evictor_type policy, const Hash_func hash) {
 	Index entry_capacity = INIT_ENTRY_CAPACITY;
 	Cache* cache = new Cache;
 	cache->mem_capacity = max_mem;
@@ -236,10 +224,10 @@ Cache* create_cache(Index max_mem, evictor_type policy, Hash_func hash) {
 	return cache;
 }
 void destroy_cache(Cache* cache) {
-	auto const hash_table_capacity = get_hash_table_capacity(cache->entry_capacity);
-	auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
-	auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
-	auto entry_book = &cache->entry_book;
+	const auto hash_table_capacity = get_hash_table_capacity(cache->entry_capacity);
+	const auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
+	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
+	const auto entry_book = &cache->entry_book;
 
 	//remove every entry
 	for(Index i = 0; i < hash_table_capacity; i += 1) {
@@ -259,22 +247,22 @@ void destroy_cache(Cache* cache) {
 	delete cache;
 }
 
-void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
+void cache_set(Cache* cache, const Key_ptr key, const Value_ptr val, const Index val_size) {
 	if(val_size > cache->mem_total) {
 		printf("Error in call to cache_set: Value exceeds max_mem\n");
 		return;
 	}
-	auto const entry_capacity = cache->entry_capacity;
-	auto const hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
-	auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
-	auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
-	auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
-	auto entry_book = &cache->entry_book;
-	auto const evictor = &cache->evictor;
-	auto const key_hash = cache->hash(key);
+	const auto entry_capacity = cache->entry_capacity;
+	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
+	const auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
+	const auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
+	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
+	const auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
+	const auto entry_book = &cache->entry_book;
+	const auto evictor = &cache->evictor;
+	const auto key_hash = cache->hash(key);
 
-	mem_unit* val_copy = new mem_unit[val_size];
+	mem_unit* val_copy = new mem_unit[val_size];//assuming val_size is in mem_units
 	memcpy(val_copy, val, val_size);
 	//check if key is in cache
 	Index expected_i = key_hash%hash_table_capacity;
@@ -331,11 +319,11 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 	}
 }
 
-Value_ptr cache_get(Cache* cache, Key_ptr key, Index* val_size) {
-	auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
-	auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
-	auto entry_book = &cache->entry_book;
-	auto const evictor = &cache->evictor;
+Value_ptr cache_get(Cache* cache, const Key_ptr key, const Index* val_size) {
+	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
+	const auto evict_data = get_evict_data(cache->mem_arena, cache->entry_capacity);
+	const auto entry_book = &cache->entry_book;
+	const auto evictor = &cache->evictor;
 
 	Index i = find_key(cache, key);
 	if(i == KEY_NOT_FOUND) {
@@ -348,24 +336,24 @@ Value_ptr cache_get(Cache* cache, Key_ptr key, Index* val_size) {
 	}
 }
 
-void cache_delete(Cache* cache, Key_ptr key) {
+void cache_delete(Cache* cache, const Key_ptr key) {
 	Index i = find_key(cache, key);
 	if(i != KEY_NOT_FOUND) {
 		remove_entry(cache, i);
 	}
 }
 
-Index cache_space_used(Cache* cache) {
+Index cache_space_used(const Cache* cache) {
 	return cache->mem_total;
 }
 
 
-Mem_array serialize_cache(Cache* cache) {
-	auto const entry_capacity = cache->entry_capacity;
-	auto const hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
-	auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
-	auto const evictor = &cache->evictor;
+Mem_array serialize_cache(const Cache* cache) {
+	const auto entry_capacity = cache->entry_capacity;
+	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
+	const auto keys = get_keys(cache->mem_arena, cache->entry_capacity);
+	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
+	const auto evictor = &cache->evictor;
 
 	auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
 	auto book_size = sizeof(Page)*entry_capacity;
@@ -438,15 +426,15 @@ Mem_array serialize_cache(Cache* cache) {
 	return ret;
 }
 
-cache_type deserialize_cache(Mem_array arr) {
+cache_type deserialize_cache(const Mem_array arr) {
 	mem_unit* mem_cache = static_cast<mem_unit*>(arr.data);
 	Cache* cache_copy = static_cast<Cache*>(arr.data);
 
-	auto const entry_capacity = cache_copy->entry_capacity;
-	auto const hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	auto keys = get_keys(cache_copy->mem_arena, cache_copy->entry_capacity);
-	auto bookmarks = get_bookmarks(cache_copy->mem_arena, cache_copy->entry_capacity);
-	auto const evictor = &cache_copy->evictor;
+	const auto entry_capacity = cache_copy->entry_capacity;
+	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
+	const auto keys = get_keys(cache_copy->mem_arena, cache_copy->entry_capacity);
+	const auto bookmarks = get_bookmarks(cache_copy->mem_arena, cache_copy->entry_capacity);
+	const auto evictor = &cache_copy->evictor;
 
 	auto hash_table_size = (2*sizeof(Index) + sizeof(Key_ptr))*hash_table_capacity;
 	auto book_size = sizeof(Page)*entry_capacity;
@@ -488,7 +476,7 @@ cache_type deserialize_cache(Mem_array arr) {
 			}
 			{//copy value into memory
 				Entry* entry_copy = read_book(new_entry_book, bookmark);
-				mem_unit* actual_value = (&string_space[reinterpret_cast<Index>(entry_copy->value)]);
+				mem_unit* actual_value = &string_space[reinterpret_cast<Index>(entry_copy->value)];
 				Index value_size = entry_copy->value_size;
 				auto new_value = new mem_unit[value_size];
 				memcpy(new_value, actual_value, value_size);
