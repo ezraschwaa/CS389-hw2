@@ -81,7 +81,7 @@ Cache* create_cache(Index max_mem, Evictor evictor, Hash_func hash) {
 
 void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 	auto const mem_capacity = cache->mem_capacity;
-	if(val_size > 0) {
+	if(val_size <= 0) {
 		printf("Error in call to cache_set: Zero length values are not allowed\n");
 		return;
 	} else if(val_size > mem_capacity) {

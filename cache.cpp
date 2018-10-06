@@ -468,9 +468,10 @@ Mem_array serialize_cache(Cache* cache) {
 
 	//replace all pointers with relative pointers
 	cache_copy->mem_arena = NULL;
-	cache_copy->entry_book.pages = NULL;
+	cache_copy->entry_book.pages = get_pages(mem_arena_copy, entry_capacity);
 
 	auto keys_copy = get_keys(mem_arena_copy, entry_capacity);
+	auto entry_book_copy = &cache_copy->entry_book;
 
 	Index string_space_end = 0;
 	entries_left = entry_total;
@@ -481,11 +482,23 @@ Mem_array serialize_cache(Cache* cache) {
 			auto bookmark = bookmarks[i];
 			Index key_hash = key_hashes[i];
 			{//copy key to string space
+				auto key_copy = &string_space[string_space_end];
 				auto key_size = find_key_size(key);
-				memcpy(&string_space[string_space_end], key, key_size);
+				memcpy(key_copy, key, key_size);
+				//store a relative pointer instead
+				keys_copy[i] = reinterpret_cast<Key_ptr>(string_space_end);
 				string_space_end += key_size;
 			}
-			// keys_copy[i] =
+			{//copy value to string space
+				Entry* entry_copy = read_book(entry_book_copy, bookmark);
+				mem_unit* value = entry_copy->value;
+				Index value_size = entry_copy->value_size;
+				mem_unit* value_copy = &string_space[string_space_end];
+				memcpy(value_copy, value, value_size);
+				//store a relative pointer instead
+				entry_copy->value = reinterpret_cast<mem_unit*>(string_space_end);
+				string_space_end += value_size;
+			}
 		}
 	}
 
