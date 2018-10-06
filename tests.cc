@@ -70,7 +70,7 @@ int test_hasher() {
 }
 
 int test_evictor() {
-    // Create caches with default evictor and a couple me-designed ones, then throw things into the caches to make sure each evictor behaves as expected; specific things to watch out for include max_mem being less than cache_space_used, and wrong items being evicted by the evictors whose workings I understand; return -1 if anything fails
+    // Create caches with default evictor, then throw things into the caches to make sure each evictor behaves as expected; specific things to watch out for include max_mem being less than cache_space_used, and wrong items being evicted by the evictors whose workings I understand; return -1 if anything fails
 
     return 0;
 }
@@ -81,29 +81,25 @@ int test_cache_set_and_get() {
     cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
     val_type retrieved_val = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
     if (read_val(retrieved_val) != read_val(SMALLVAL)) {
-        std::cout << "Small value stored or retrieved incorrectly in set/get test.\n";
+        std::cout << "Small value stored or retrieved incorrectly in set/get test. Stored value: " << read_val(SMALLVAL) << "; retrieved value: " << read_val(retrieved_val) << ".\n";
         return -1;
     }
 
     cache_set(cache1, KEY1, LARGEVAL, LARGEVAL_SIZE);
     retrieved_val = cache_get(cache1, KEY1, &LARGEVAL_SIZE);
     if (read_val(retrieved_val) != read_val(LARGEVAL)) {
-        std::cout << "Large value stored or retrieved incorrectly in set/get test.\n";
+        std::cout << "Large value stored or retrieved incorrectly in set/get test. Stored value: " << read_val(LARGEVAL) << "; retrieved value: " << read_val(retrieved_val) << ".\n";
         return -1;
     }
 
     retrieved_val = cache_get(cache1, UNUSEDKEY, &SMALLVAL_SIZE);
     if (retrieved_val != NULL) {
-        std::cout << "Value retrieved without being assigned.\n";
+        std::cout << "Unassigned key had value initialized already assigned to it. Expected null pointer; received pointer to value " << read_val(retrieved_val) << ".\n";
         return -1;
     }
 
     return 0;
 }
-
-// Tests for cache_delete
-//     Delete everything after getting it to make sure that works
-//     Also delete some un-gotten stuff to make sure that it's not purely the "get then delete" order of operations that works
 
 int test_cache_delete() {
     cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
@@ -111,14 +107,28 @@ int test_cache_delete() {
     cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
     val_type retrieved_val = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
     if (read_val(retrieved_val) != read_val(SMALLVAL)) {
-        std::cout << "Small value stored or retrieved incorrectly in delete test.\n";
+        std::cout << "Small value stored or retrieved incorrectly in delete test. Stored value: " << read_val(SMALLVAL) << "; retrieved value: " << read_val(retrieved_val) << ".\n";
         return -1;
     }
 
     cache_delete(cache1, KEY1);
     retrieved_val = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
     if (retrieved_val != NULL) {
-        std::cout << "Small value was not deleted cleanly.\n";
+        std::cout << "Small value was not deleted cleanly. Expected null pointer; received pointer to value " << read_val(retrieved_val) << ".\n";
+        return -1;
+    }
+
+    cache_set(cache1, KEY1, LARGEVAL, LARGEVAL_SIZE);
+    retrieved_val = cache_get(cache1, KEY1, &LARGEVAL_SIZE);
+    if (read_val(retrieved_val) != read_val(LARGEEVAL)) {
+        std::cout << "Large value stored or retrieved incorrectly in delete test. Stored value: " << read_val(LARGEVAL) << "; retrieved value: " << read_val(retrieved_val) << ".\n";
+        return -1;
+    }
+
+    cache_delete(cache1, KEY1);
+    retrieved_val = cache_get(cache1, KEY1, &LARGEVAL_SIZE);
+    if (retrieved_val != NULL) {
+        std::cout << "Large value was not deleted cleanly. Expected null pointer; received pointer to value " << read_val(retrieved_val) << ".\n";
         return -1;
     }
 
@@ -127,43 +137,40 @@ int test_cache_delete() {
     return 0;
 }
 
-// Tests for cache_space_used
-//     Seems pretty simple, just dump some stuff in the cache and make sure the numbers are reasonable (plus obligatory "what if inputs are too big" test), then delete them to make sure they go down accordingly
-
 int test_cache_space_used() {
     cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
 
     const index_type space1 = cache_space_used(cache1);
     if (space1 != 0) {
-        std::cout << "Cache was not initialized with 0 space used. Space filled on initialization: " << space1 << "\n";
+        std::cout << "Cache was not initialized with 0 space used. Space filled on initialization: " << space1 << ".\n";
         return -1;
     }
 
     cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
     const index_type space2 = cache_space_used(cache1);
     if (space2 != SMALLVAL_SIZE) {
-        std::cout << "Cache failed to add used space from small input value. Previous space used: " << space1 << "; expected space used: " << SMALLVAL_SIZE << "; reported space used: " << space2 << "\n";
+        std::cout << "Cache failed to add used space from small input value. Previous space used: " << space1 << "; expected space used: " << SMALLVAL_SIZE << "; reported space used: " << space2 << ".\n";
         return -1;
     }
 
     cache_set(cache1, KEY2, LARGEVAL, LARGEVAL_SIZE);
     const index_type space3 = cache_space_used(cache1);
     if (space3 != (SMALLVAL_SIZE + LARGEVAL_SIZE)) {
-        std::cout << "Cache failed to add used space from large input value. Previous space used: " << space2 << "; expected space used: " << (SMALLVAL_SIZE + LARGEVAL_SIZE) << "; reported space used: " << space3 << "\n";
+        std::cout << "Cache failed to add used space from large input value. Previous space used: " << space2 << "; expected space used: " << (SMALLVAL_SIZE + LARGEVAL_SIZE) << "; reported space used: " << space3 << ".\n";
         return -1;
     }
 
     cache_delete(cache1, KEY1);
     const index_type space4 = cache_space_used(cache1);
     if (space4 != LARGEVAL_SIZE) {
-        std::cout << "Cache failed to remove space from large deleted value. Previous space used: " << space3 << "; expected new space used: " << LARGEVAL_SIZE << "reported new space used: " << space4 << "\n";
+        std::cout << "Cache failed to remove space from large deleted value. Previous space used: " << space3 << "; expected new space used: " << LARGEVAL_SIZE << "reported new space used: " << space4 << ".\n";
         return -1;
     }
 
     cache_delete(cache1, KEY2);
     const index_type space5 = cache_space_used(cache1);
     if (space5 != 0) {
-        std::cout << "Cache failed to remove space from small deleted value. Previous space used: " << space4 << "; expected new space used: 0; reported new space used: " << space5 << "\n";
+        std::cout << "Cache failed to remove space from small deleted value. Previous space used: " << space4 << "; expected new space used: 0; reported new space used: " << space5 << ".\n";
         return -1;
     }
 
