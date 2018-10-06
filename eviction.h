@@ -1,7 +1,7 @@
 //By Monica Moniot
 #include "cache.h"
 
-using mem_unit = uint8_t;
+using mem_unit = uint8_t;//this must have the size of a unit of memory (a byte)
 
 using Cache = cache_obj;
 using Key_ptr = key_type;
