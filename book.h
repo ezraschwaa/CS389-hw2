@@ -1,9 +1,13 @@
 //By Monica Moniot and Alyssa Riceman
 #pragma once
-#include <cstring>
 #include "cache.h"
 #include "types.h"
 
+
+//Book is a data structure for allocating memory of a fixed size in constant time
+//Page is the unit of fixed size memory that book allocates
+//Bookmark is a relative pointer to a page in book
+//Page_data defines the type and size of memory that book allocates
 
 constexpr Bookmark INVALID_PAGE = -1;
 

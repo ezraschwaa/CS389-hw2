@@ -1,22 +1,20 @@
 //By Monica Moniot and Alyssa Riceman
 #include <stdlib.h>
 #include <cstring>
-#include <cassert>
 #include "eviction.h"
 #include "book.h"
 #include "types.h"
 
-constexpr Index INVALID_NODE = -1;
+constexpr Bookmark INVALID_NODE = -1;
 
-
-inline Evict_item* get_evict_item(Book* book, Index item_i) {
+inline Evict_item* get_evict_item(Book* book, Bookmark item_i) {
 	return &read_book(book, item_i)->evict_item;
 }
 
-Node* get_node(Book* book, Index item_i) {
+Node* get_node(Book* book, Bookmark item_i) {
 	return &get_evict_item(book, item_i)->node;
 }
-void remove(DLL* list, Index item_i, Node* node, Book* book) {
+void remove  (DLL* list, Bookmark item_i, Node* node, Book* book) {
 	auto next_i = node->next;
 	auto pre_i = node->pre;
 
@@ -34,8 +32,8 @@ void remove(DLL* list, Index item_i, Node* node, Book* book) {
 		list->last = pre_i;
 	}
 }
-void append(DLL* list, Index item_i, Node* node, Book* book) {
-	Index last = list->last;
+void append  (DLL* list, Bookmark item_i, Node* node, Book* book) {
+	auto last = list->last;
 	if(last == INVALID_NODE) {
 		list->first = item_i;
 	} else {
@@ -46,7 +44,7 @@ void append(DLL* list, Index item_i, Node* node, Book* book) {
 	node->next = INVALID_NODE;
 	list->last = item_i;
 }
-void set_last(DLL* list, Index item_i, Node* node, Book* book) {
+void set_last(DLL* list, Bookmark item_i, Node* node, Book* book) {
 	auto last = list->first;
 	if(last == list->first or item_i == list->last) {
 		return;
@@ -91,9 +89,10 @@ void create_evictor(Evictor* evictor, evictor_type policy, void* mem_arena) {
 	}
 }
 
-Index evict_item(Evictor* evictor, Book* book, void* mem_arena) {//return item to evict
+Bookmark evict_item(Evictor* evictor, Book* book, void* mem_arena) {
+	//return item to evict
 	auto policy = evictor->policy;
-	Index item_i = 0;
+	Bookmark item_i = 0;
 	if(policy == FIFO) {
 		auto list = &evictor->data.list;
 		item_i = list->first;
@@ -104,7 +103,7 @@ Index evict_item(Evictor* evictor, Book* book, void* mem_arena) {//return item t
 		remove(list, item_i, get_node(book, item_i), book);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
-		auto rand_items = static_cast<Index*>(mem_arena);
+		auto rand_items = static_cast<Bookmark*>(mem_arena);
 		auto rand_i0 = rand()%data->total_items;
 		item_i = rand_items[rand_i0];
 		//We need to delete rand_i0 from rand_items in place
@@ -117,8 +116,8 @@ Index evict_item(Evictor* evictor, Book* book, void* mem_arena) {//return item t
 	}
 	return item_i;
 }
-
-void add_item(Evictor* evictor, Index item_i, Evict_item* item, Book* book, void* mem_arena) {//item was created
+void add_item      (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book, void* mem_arena) {
+	//item was created
 	//we must init "item"
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
@@ -129,14 +128,14 @@ void add_item(Evictor* evictor, Index item_i, Evict_item* item, Book* book, void
 		append(&evictor->data.list, item_i, node, book);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
-		auto rand_items = static_cast<Index*>(mem_arena);
+		auto rand_items = static_cast<Bookmark*>(mem_arena);
 		item->rand_i = data->total_items;
 		rand_items[data->total_items] = item_i;
 		data->total_items += 1;
 	}
 }
-
-void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Book* book, void* mem_arena) {//item was removed
+void remove_item   (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book, void* mem_arena) {
+	//item was removed
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
 		auto node = &item->node;
@@ -146,10 +145,10 @@ void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Book* book, v
 		remove(&evictor->data.list, item_i, node, book);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
-		auto rand_items = static_cast<Index*>(mem_arena);
+		auto rand_items = static_cast<Bookmark*>(mem_arena);
 		//We need to delete from rand_items in place
 		//this requires us to relink some data objects
-		Index rand_i0 = item->rand_i;
+		Bookmark rand_i0 = item->rand_i;
 		auto rand_i1 = data->total_items - 1;
 		data->total_items = rand_i1;
 		auto item_i1 = get_evict_item(book, rand_items[rand_i1]);
@@ -157,8 +156,8 @@ void remove_item(Evictor* evictor, Index item_i, Evict_item* item, Book* book, v
 		item_i1->rand_i = rand_i0;
 	}
 }
-
-void touch_item(Evictor* evictor, Index item_i, Evict_item* item, Book* book, void* mem_arena) {//item was touched
+void touch_item    (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book, void* mem_arena) {
+	//item was touched
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
 

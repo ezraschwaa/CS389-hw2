@@ -40,12 +40,9 @@ struct Evictor {
 };
 
 
-//Book is a data structure for allocating memory of a fixed size in constant time
-//Page is the unit of fixed size memory that book allocates
-//Bookmark is a relative pointer to a page in book
-//Page_data defines the type and size of memory that book allocates
+
 struct Entry {
-	Index cur_i;
+	Index cur_i;//index to the entry's position in the hash table
 	Key_ptr key;
 	Index key_size;
 	byte* value;
