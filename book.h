@@ -12,13 +12,6 @@ inline void create_book(Book* book, Page* pages, Bookmark size) {
 	book->end = 0;
 	book->pages = pages;
 }
-inline void delete_book(Book* book) {
-	book->pages = NULL;
-}
-inline void copy_book(Book* book, Page* new_pages, Bookmark pre_size) {
-	memcpy(new_pages, book->pages, pre_size);
-	book->pages = new_pages;
-}
 inline Bookmark alloc_book_page(Book* book) {
 	auto pages = book->pages;
 	auto bookmark = book->first_unused;
@@ -36,6 +29,6 @@ inline void free_book_page(Book* book, Bookmark bookmark) {
 	page->next = book->first_unused;
 	book->first_unused = bookmark;
 }
-inline Page_data* read_book(Book* book, Bookmark bookmark) {
+constexpr inline Page_data* read_book(const Book* book, Bookmark bookmark) {
 	return &book->pages[bookmark].data;
 }

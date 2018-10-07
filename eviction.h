@@ -6,7 +6,7 @@
 
 
 void create_evictor(Evictor* evictor, evictor_type policy, void* mem_arena);
-constexpr Index get_mem_size_of_evictor(evictor_type policy, Index entry_capacity) {
+constexpr Index get_evictor_mem_size(evictor_type policy, Index entry_capacity) {
    if(policy == FIFO) {
 	   return 0;
    } else if(policy == LRU) {
