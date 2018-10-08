@@ -89,7 +89,7 @@ void create_evictor(Evictor* evictor, evictor_type policy, void* mem_arena) {
 	}
 }
 
-Bookmark evict_item(Evictor* evictor, Book* book, void* mem_arena) {
+Bookmark get_evict_item(Evictor* evictor, Book* book, void* mem_arena) {
 	//return item to evict
 	auto policy = evictor->policy;
 	Bookmark item_i = 0;
@@ -116,7 +116,7 @@ Bookmark evict_item(Evictor* evictor, Book* book, void* mem_arena) {
 	}
 	return item_i;
 }
-void add_item      (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book, void* mem_arena) {
+void add_evict_item      (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book, void* mem_arena) {
 	//item was created
 	//we must init "item"
 	auto policy = evictor->policy;
@@ -134,7 +134,7 @@ void add_item      (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* b
 		data->total_items += 1;
 	}
 }
-void remove_item   (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book, void* mem_arena) {
+void remove_evict_item   (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book, void* mem_arena) {
 	//item was removed
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
@@ -156,7 +156,7 @@ void remove_item   (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* b
 		item_i1->rand_i = rand_i0;
 	}
 }
-void touch_item    (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book, void* mem_arena) {
+void touch_evict_item    (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book, void* mem_arena) {
 	//item was touched
 	auto policy = evictor->policy;
 	if(policy == FIFO) {

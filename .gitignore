@@ -7,3 +7,4 @@ eviction.h.gch
 eviction.o
 book.h.gch
 test
+types.h.gch
