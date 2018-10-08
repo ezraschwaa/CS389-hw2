@@ -23,6 +23,7 @@ typedef index_type (*hash_func)(key_type key);
 enum {//evictor_types
 	FIFO,
 	LRU,
+	LFU,//LFU cannot be done in constant time
 	RANDOM,
 };
 typedef long int evictor_type;

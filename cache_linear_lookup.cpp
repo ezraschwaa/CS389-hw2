@@ -59,9 +59,9 @@ void inline remove_entry(Cache* cache, Index i) {
 
 	cache->mem_size -= value_sizes[i];
 	cache->entry_size -= 1;
-	delete values[i];
+	delete[] values[i];
 
-	delete keys[i];
+	delete[] keys[i];
 	//in place delete the entry
 	auto replace_i = cache->entry_size;
 	values[i] = values[replace_i];
@@ -107,7 +107,7 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 		if(are_keys_equal(key, cur_key)) {
 			//delete previous value
 			cache->mem_size -= value_sizes[i];
-			delete values[i];
+			delete[] values[i];
 
 			//add new value
 			values[i] = val_copy;
@@ -186,11 +186,11 @@ void destroy_cache(Cache* cache) {
 	for(Index i = 0; i < cache->entry_size; i += 1) {
 		remove_entry(cache, i);
 	}
-	delete values;
+	delete[] values;
 	cache->values = NULL;
-	delete value_sizes;
+	delete[] value_sizes;
 	cache->value_sizes = NULL;
-	delete keys;
+	delete[] keys;
 	cache->keys = NULL;
 	delete cache;
 }

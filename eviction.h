@@ -8,13 +8,15 @@
 
 void create_evictor(Evictor* evictor, evictor_type policy);
 constexpr Index get_evictor_mem_size(evictor_type policy, Index entry_capacity) {
-   if(policy == FIFO) {
-	   return 0;
-   } else if(policy == LRU) {
-	   return 0;
-   } else {//RANDOM
-	   return sizeof(Index)*entry_capacity;
-   }
+	if(policy == FIFO) {
+		return 0;
+	} else if(policy == LRU) {
+		return 0;
+	} else if(policy == LFU) {
+		return 0;
+	} else {//RANDOM
+		return sizeof(Index)*entry_capacity;
+	}
 }
 
 Bookmark get_evict_item(Evictor* evictor, Book* book);//also removes item
