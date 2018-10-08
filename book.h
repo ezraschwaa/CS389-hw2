@@ -1,13 +1,15 @@
 //By Monica Moniot and Alyssa Riceman
-#pragma once
+#ifndef BOOK_H
+#define BOOK_H
 #include "cache.h"
 #include "types.h"
 
 
-//Book is a data structure for allocating memory of a fixed size in constant time
-//Page is the unit of fixed size memory that book allocates
-//Bookmark is a relative pointer to a page in book
-//Page_data defines the type and size of memory that book allocates
+//Book is a data structure for allocating and reallocating memory of a fixed size in constant time
+//Page is the unit of fixed size memory that a book allocates
+//Bookmark is a relative pointer to a page in a book
+//Page_data defines the type and size of memory that a book allocates
+//The current implementation of book makes the caller responsible for all of book's memory
 
 constexpr Bookmark INVALID_PAGE = -1;
 
@@ -36,3 +38,4 @@ inline void free_book_page(Book* book, Bookmark bookmark) {
 constexpr inline Page_data* read_book(const Book* book, Bookmark bookmark) {
 	return &book->pages[bookmark].data;
 }
+#endif

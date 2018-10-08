@@ -1,7 +1,7 @@
 //By Monica Moniot and Alyssa Riceman
-#pragma once
+#ifndef TYPES_H
+#define TYPES_H
 #include "cache.h"
-
 
 using byte = uint8_t;//this must have the size of a unit of memory (a byte)
 using uint_ptr = uint64_t;//this must have the size of a pointer
@@ -37,6 +37,7 @@ union Evictor_data {
 struct Evictor {
 	evictor_type policy;
 	Evictor_data data;
+	void* mem_arena;
 };
 
 
@@ -74,3 +75,4 @@ struct cache_obj {//Definition of Cache
 	Hash_func hash;
 	Evictor evictor;
 };
+#endif

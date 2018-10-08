@@ -1,11 +1,12 @@
-#pragma once
+#ifndef CACHE_H
+#define CACHE_H
 /*
  * Interface for a generic cache object.
  * Data is given as blobs (void *) of a given size,
  * and indexed by a string key.
  */
 
- #include <inttypes.h>
+#include <inttypes.h>
 
 // An unspecified (implementation dependent, in the C file) cache object.
 struct cache_obj;
@@ -61,3 +62,4 @@ struct Mem_array {
 Mem_array serialize_cache(cache_type cache);
 
 cache_type deserialize_cache(Mem_array arr);
+#endif

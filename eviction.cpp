@@ -74,7 +74,7 @@ void set_last(DLL* list, Bookmark item_i, Node* node, Book* book) {
 }
 
 
-void create_evictor(Evictor* evictor, evictor_type policy, void* mem_arena) {
+void create_evictor(Evictor* evictor, evictor_type policy) {
 	evictor->policy = policy;
 	if(policy == FIFO) {
 		auto list = &evictor->data.list;
@@ -89,7 +89,7 @@ void create_evictor(Evictor* evictor, evictor_type policy, void* mem_arena) {
 	}
 }
 
-Bookmark get_evict_item(Evictor* evictor, Book* book, void* mem_arena) {
+Bookmark get_evict_item(Evictor* evictor, Book* book) {
 	//return item to evict
 	auto policy = evictor->policy;
 	Bookmark item_i = 0;
@@ -103,7 +103,7 @@ Bookmark get_evict_item(Evictor* evictor, Book* book, void* mem_arena) {
 		remove(list, item_i, get_node(book, item_i), book);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
-		auto rand_items = static_cast<Bookmark*>(mem_arena);
+		auto rand_items = static_cast<Bookmark*>(evictor->mem_arena);
 		auto rand_i0 = rand()%data->total_items;
 		item_i = rand_items[rand_i0];
 		//We need to delete rand_i0 from rand_items in place
@@ -116,7 +116,7 @@ Bookmark get_evict_item(Evictor* evictor, Book* book, void* mem_arena) {
 	}
 	return item_i;
 }
-void add_evict_item      (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book, void* mem_arena) {
+void add_evict_item      (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book) {
 	//item was created
 	//we must init "item"
 	auto policy = evictor->policy;
@@ -128,13 +128,13 @@ void add_evict_item      (Evictor* evictor, Bookmark item_i, Evict_item* item, B
 		append(&evictor->data.list, item_i, node, book);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
-		auto rand_items = static_cast<Bookmark*>(mem_arena);
+		auto rand_items = static_cast<Bookmark*>(evictor->mem_arena);
 		item->rand_i = data->total_items;
 		rand_items[data->total_items] = item_i;
 		data->total_items += 1;
 	}
 }
-void remove_evict_item   (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book, void* mem_arena) {
+void remove_evict_item   (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book) {
 	//item was removed
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
@@ -145,7 +145,7 @@ void remove_evict_item   (Evictor* evictor, Bookmark item_i, Evict_item* item, B
 		remove(&evictor->data.list, item_i, node, book);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
-		auto rand_items = static_cast<Bookmark*>(mem_arena);
+		auto rand_items = static_cast<Bookmark*>(evictor->mem_arena);
 		//We need to delete from rand_items in place
 		//this requires us to relink some data objects
 		Bookmark rand_i0 = item->rand_i;
@@ -156,7 +156,7 @@ void remove_evict_item   (Evictor* evictor, Bookmark item_i, Evict_item* item, B
 		item_i1->rand_i = rand_i0;
 	}
 }
-void touch_evict_item    (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book, void* mem_arena) {
+void touch_evict_item    (Evictor* evictor, Bookmark item_i, Evict_item* item, Book* book) {
 	//item was touched
 	auto policy = evictor->policy;
 	if(policy == FIFO) {
