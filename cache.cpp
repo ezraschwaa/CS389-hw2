@@ -43,9 +43,9 @@ Index get_key_size(const Key_ptr key) {
 }
 Index default_key_hasher(Key_ptr key) {
 	//generates a hash of a c string
-	Index hash = 0;
 	Index i = 0;
 	Index size = get_key_size(key);
+	Index hash = size*HASH_MULTIPLIER;
 	auto key_as_index = reinterpret_cast<const Index*>(key);
 	Index key_as_index_size = size/sizeof(Index);
 	for(; i < key_as_index_size; i += 1) {
