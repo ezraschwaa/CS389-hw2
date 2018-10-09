@@ -167,14 +167,14 @@ inline void remove_entry(Cache* cache, Index i) {
 	auto bookmark = bookmarks[i];
 	Entry* entry = read_book(entry_book, bookmark);
 
-	delete entry->key;
+	delete[] entry->key;
 	entry->key = NULL;
 	key_hashes[i] = DELETED;
 	cache->entry_total -= 1;
 	cache->dead_total += 1;
 
 	cache->mem_total -= entry->value_size;
-	delete entry->value;
+	delete[] entry->value;
 	entry->value = NULL;
 
 	remove_evict_item(evictor, bookmark, &entry->evict_item, entry_book);
@@ -247,7 +247,7 @@ inline void grow_cache_size(Cache* cache) {
 	}
 	cache->dead_total = 0;
 
-	delete pre_mem_arena;
+	delete[] pre_mem_arena;
 }
 
 
@@ -284,14 +284,14 @@ void destroy_cache(Cache* cache) {
 		auto cur_key_hash = key_hashes[i];
 		if(cur_key_hash != EMPTY and cur_key_hash != DELETED) {//delete entry
 			Entry* entry = read_book(entry_book, bookmarks[i]);
-			delete entry->key;
+			delete[] entry->key;
 			entry->key = NULL;
 			//no need to free the entry, it isn't generally allocated
-			delete entry->value;
+			delete[] entry->value;
 			entry->value = NULL;
 		}
 	}
-	delete cache->mem_arena;
+	delete[] cache->mem_arena;
 	cache->mem_arena = NULL;
 	entry_book->pages = NULL;
 	delete cache;
@@ -328,7 +328,7 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 			if(are_keys_equal(entry->key, key)) {//found key
 				update_mem_size(cache, val_size - entry->value_size);
 				//delete previous value
-				delete entry->value;
+				delete[] entry->value;
 				//add new value
 				entry->value = val_copy;
 				entry->value_size = val_size;
@@ -368,7 +368,7 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 	}
 }
 
-Value_ptr cache_get(Cache* cache, Key_ptr key, Index* _) {
+Value_ptr cache_get(Cache* cache, Key_ptr key, Index* ret_val_size) {
 	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
 	const auto entry_book = &cache->entry_book;
 	const auto evictor = &cache->evictor;
@@ -381,6 +381,7 @@ Value_ptr cache_get(Cache* cache, Key_ptr key, Index* _) {
 		Entry* entry = read_book(entry_book, bookmark);
 		//let the evictor know this value was accessed
 		touch_evict_item(evictor, bookmark, &entry->evict_item, entry_book);
+		*ret_val_size = entry->value_size;
 		return static_cast<Value_ptr>(entry->value);
 	}
 }

@@ -22,9 +22,12 @@ typedef index_type (*hash_func)(key_type key);
 // User-defined type for an eviction policy. Unspecified by API.
 enum {//evictor_types
 	FIFO,
+	LIFO,
 	LRU,
-	LFU,//LFU cannot be done in constant time
-	RANDOM,
+	MRU,
+	CLOCK,
+	SLRU,
+	RR,
 };
 typedef long int evictor_type;
 

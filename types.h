@@ -16,14 +16,19 @@ using Hash_func = hash_func;
 struct Node {
 	Index next;
 	Index pre;
+	bool rf_bit;
 };
 union Evict_item {
 	Index rand_i;
 	Node node;
 };
 struct DLL {
-	Index last;
-	Index first;
+	Index head;
+};
+struct SLRU_data {
+	DLL protect;
+	DLL prohibate;
+	bool protect_id;
 };
 
 struct Rand_data {
@@ -32,6 +37,7 @@ struct Rand_data {
 union Evictor_data {
 	DLL list;
 	Rand_data rand_data;
+	SLRU_data dlist;
 };
 
 struct Evictor {
