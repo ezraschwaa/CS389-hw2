@@ -52,7 +52,7 @@ Index default_key_hasher(Key_ptr key) {
 		hash = hash^(key_as_index[i]*HASH_MULTIPLIER);
 	}
 	for(Index j = sizeof(Index)*key_as_index_size; j < size; j += 1) {
-		hash = hash^(key[size]*HASH_MULTIPLIER);
+		hash = hash^(key[j]*HASH_MULTIPLIER);
 	}
 	return hash;
 }
