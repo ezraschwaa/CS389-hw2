@@ -127,6 +127,12 @@ inline byte* allocate(Index entry_capacity, evictor_type policy) {
 }
 
 
+void mark_as_empty(Index* key_hashes, Index hash_table_capacity) {
+	for(Index i = 0; i < hash_table_capacity; i += 1) {
+		key_hashes[i] = EMPTY;
+	}
+}
+
 constexpr Index KEY_NOT_FOUND = -1;
 inline Index find_entry(const Cache* cache, const Key_ptr key) {
 	//gets the hash table index associated to key
@@ -214,7 +220,7 @@ inline void grow_cache_size(Cache* cache) {
 	const auto new_evict_data = get_evict_data(new_mem_arena, new_capacity);
 
 	//make sure all entries are marked as EMPTY, so they can be populated
-	memset(new_key_hashes, EMPTY, get_hash_table_capacity(new_capacity));
+	mark_as_empty(new_key_hashes, get_hash_table_capacity(new_capacity));
 	memcpy(new_pages, pre_pages, sizeof(Page)*pre_capacity);
 	memcpy(new_evict_data, pre_evict_data, get_evictor_mem_size(cache->evictor.policy, pre_capacity));
 	entry_book->pages = new_pages;
@@ -266,7 +272,7 @@ Cache* create_cache(Index max_mem, evictor_type policy, Hash_func hash) {
 	}
 	auto mem_arena = allocate(entry_capacity, policy);
 	//make sure all entries are marked as EMPTY, so they can be populated
-	memset(get_hashes(mem_arena, entry_capacity), EMPTY, get_hash_table_capacity(entry_capacity));
+	mark_as_empty(get_hashes(mem_arena, entry_capacity), get_hash_table_capacity(entry_capacity));
 	cache->mem_arena = mem_arena;
 	create_book(&cache->entry_book, get_pages(mem_arena, entry_capacity), entry_capacity);
 	cache->evictor.mem_arena = get_evict_data(mem_arena, entry_capacity);
@@ -438,7 +444,7 @@ Mem_array serialize_cache(Cache* cache) {
 	byte* string_space = mem_cache + sizeof(Cache) + mem_arena_size;
 
 	memcpy(mem_cache, cache, sizeof(Cache));
-	memset(mem_key_hashes, EMPTY, hash_table_capacity);
+	mark_as_empty(reinterpret_cast<Index*>(mem_key_hashes), hash_table_capacity);
 	memcpy(mem_arena_copy, &cache->mem_arena, mem_arena_size);
 
 	//replace all pointers with relative pointers
