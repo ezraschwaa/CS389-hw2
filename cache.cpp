@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cassert>//--<--remove eventually
 #include <stdio.h>
+#include <iostream>
 #include "types.h"
 #include "book.h"
 #include "eviction.h"
@@ -160,7 +161,7 @@ inline Index find_entry(const Cache* cache, const Key_ptr key) {
 		}
 		expected_i = (expected_i + step_size)%hash_table_capacity;
 	}
-	printf("Error when attempting to find entry in cache: index was %d, step was %d, key was %s, size was %d", expected_i, step_size, key, hash_table_capacity);
+	std::cout<<"Error when attempting to find entry in cache: index was %d, step was %d, key was %s, size was %d"<< expected_i<< step_size<< key<< hash_table_capacity;
 	return KEY_NOT_FOUND;
 }
 
