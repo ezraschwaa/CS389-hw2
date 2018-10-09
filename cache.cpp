@@ -150,7 +150,7 @@ inline Index find_entry(const Cache* cache, const Key_ptr key) {
 		if(cur_key_hash == EMPTY) {
 			break;
 		} else if(cur_key_hash == DELETED) {
-			continue;
+			// continue;
 		} else if(cur_key_hash == key_hash) {
 			Entry* entry = read_book(entry_book, bookmarks[expected_i]);
 			if(are_keys_equal(entry->key, key)) {//found key
