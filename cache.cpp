@@ -47,11 +47,12 @@ Index default_key_hasher(Key_ptr key) {
 	Index i = 0;
 	Index size = get_key_size(key);
 	auto key_as_index = reinterpret_cast<const Index*>(key);
-	for(; sizeof(Index)*i < size; i += 1) {
+	Index key_as_index_size = size/sizeof(Index);
+	for(; i < key_as_index_size; i += 1) {
 		hash = hash^(key_as_index[i]*HASH_MULTIPLIER);
 	}
-	for(Index j = 0; j < size%sizeof(Index) - 1; j += 1) {
-		hash = hash^(key[j + sizeof(Index)*i]*HASH_MULTIPLIER);
+	for(Index j = sizeof(Index)*key_as_index_size; j < size; j += 1) {
+		hash = hash^(key[size]*HASH_MULTIPLIER);
 	}
 	return hash;
 }
