@@ -45,7 +45,8 @@ Index default_key_hasher(Key_ptr key) {
 	//generates a hash of a c string
 	Index i = 0;
 	Index size = get_key_size(key);
-	Index hash = size*HASH_MULTIPLIER;
+	// Index hash = size*HASH_MULTIPLIER;
+	Index hash = 0;
 	auto key_as_index = reinterpret_cast<const Index*>(key);
 	Index key_as_index_size = size/sizeof(Index);
 	for(; i < key_as_index_size; i += 1) {
@@ -159,6 +160,7 @@ inline Index find_entry(const Cache* cache, const Key_ptr key) {
 		}
 		expected_i = (expected_i + step_size)%hash_table_capacity;
 	}
+	printf("Error when attempting to find entry in cache: index was %d, step was %d, key was %s, size was %d", expected_i, step_size, key, hash_table_capacity);
 	return KEY_NOT_FOUND;
 }
 
