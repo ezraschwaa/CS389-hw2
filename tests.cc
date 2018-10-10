@@ -5,9 +5,15 @@
 #include <string>
 #include <memory>
 #include "cache.h"
+#include "book.h"
+#include "eviction.h"
+#include "types.h"
 
-// Deleting the resulting pointer is warning-provoking; fix later
-// Helper function for generating test strings of at least one "a"
+//////////////////////
+// Helper Functions //
+//////////////////////
+
+// Helper function for generating strings of at least one "a"
 char* make_str_of_defined_length(index_type length) {
     char* newstr = new char[length];
     for(index_type i = 0; i < (length - 1); i++) {
@@ -17,27 +23,9 @@ char* make_str_of_defined_length(index_type length) {
     return newstr;
 }
 
-const index_type CACHE_SIZE = 4096;
-const key_type KEY1 = "43";
-const key_type KEY2 = "44";
-const key_type UNUSEDKEY = "bb";
-char* SMALLVAL = make_str_of_defined_length(2);
-index_type SMALLVAL_SIZE = 2; //Val sizes can't be const because cache_get requires a non-const val pointer
-char* LARGEVAL = make_str_of_defined_length(128);
-index_type LARGEVAL_SIZE = 128;
-
-// Helper function for test_hasher and test_create_cache
-index_type bad_hash_func_2(const char* message) {
+// Helper function for test_create_cache and test_hasher
+index_type bad_hash_func(const char* message) {
     return message[0];
-}
-
-// Helper function for test_hasher
-index_type bad_hash_func_1(const char* message) {
-    if (sizeof(message) < 5) {
-        return message[0];
-    } else {
-        return message[1];
-    }
 }
 
 // Helper function for reading values
@@ -47,30 +35,36 @@ std::string read_val(val_type value) {
     return val_as_string;
 }
 
-// Ensure that cache creation works with different cache sizes and presence or absent of user-input hash functions
-int test_create_cache() {
-    const index_type SMALL_CACHE_SIZE = 64;
-    const index_type LARGE_CACHE_SIZE = (pow(2, 24));
+//////////////////////
+// Global variables //
+//////////////////////
 
-    create_cache(CACHE_SIZE, FIFO, NULL);
-    create_cache(CACHE_SIZE, FIFO, &bad_hash_func_1);
-    create_cache(SMALL_CACHE_SIZE, FIFO, NULL);
-    create_cache(LARGE_CACHE_SIZE, FIFO, NULL);
+const index_type CACHE_SIZE = 4096;
+const index_type SMALL_CACHE_SIZE = 64;
+const index_type LARGE_CACHE_SIZE = (pow(2, 24));
+const key_type KEY1 = "43";
+const key_type KEY2 = "44";
+const key_type UNUSEDKEY = "bb";
+char* SMALLVAL = make_str_of_defined_length(2); //Vals can't be const because they need to be cast to void*
+index_type SMALLVAL_SIZE = 2; //Val sizes can't be const because cache_get requires a non-const val pointer
+char* LARGEVAL = make_str_of_defined_length(128);
+index_type LARGEVAL_SIZE = 128;
 
-    return 0;
-}
+////////////////////
+// Test Functions //
+////////////////////
 
-int test_hasher() {
+// Test to ensure that cache creation and destruction work with different cache sizes and presence or absence of user-input hash functions, to ensure that any errors which may arise from doing so arise
+int test_create_cache_and_destroy_cache() {
     cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    cache_type cache2 = create_cache(CACHE_SIZE, FIFO, &bad_hash_func_1);
-    cache_type cache3 = create_cache(CACHE_SIZE, FIFO, &bad_hash_func_2);
-    // test what happens if a hash function has collisions, and make sure that different inputs don't end up keyed together outside of the collision case; return -1 if anything fails
+    cache_type cache2 = create_cache(CACHE_SIZE, FIFO, &bad_hash_func);
+    cache_type cache3 = create_cache(SMALL_CACHE_SIZE, FIFO, NULL);
+    cache_type cache4 = create_cache(LARGE_CACHE_SIZE, FIFO, NULL);
 
-    return 0;
-}
-
-int test_evictor() {
-    // Create caches with default evictor, then throw things into the caches to make sure each evictor behaves as expected; specific things to watch out for include max_mem being less than cache_space_used, and wrong items being evicted by the evictors whose workings I understand; return -1 if anything fails
+    destroy_cache(cache1);
+    destroy_cache(cache2);
+    destroy_cache(cache3);
+    destroy_cache(cache4);
 
     return 0;
 }
@@ -98,6 +92,72 @@ int test_cache_set_and_get() {
         return -1;
     }
 
+    destroy_cache(cache1);
+
+    return 0;
+}
+
+int test_hasher() {
+    cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    cache_type cache2 = create_cache(CACHE_SIZE, FIFO, &bad_hash_func);
+
+    cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
+    cache_set(cache1, KEY2, LARGEVAL, LARGEVAL_SIZE);
+    val_type retrieved_val_1 = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
+    val_type retrieved_val_2 = cache_get(cache1, KEY2, &LARGEVAL_SIZE);
+    if (read_val(retrieved_val_1) == read_val(retrieved_val_2)) {
+        std::cout << "Non-identical stored values are read as identical on retrieval with default hasher. Stored values: " << read_val(SMALLVAL) << ", " << read_val(LARGEVAL) << "; retrieved values: " << read_val(retrieved_val_1) << ", " << read_val(retrieved_val_2) << ".\n";
+        return -1;
+    }
+
+    cache_set(cache2, KEY1, SMALLVAL, SMALLVAL_SIZE);
+    cache_set(cache2, KEY2, LARGEVAL, LARGEVAL_SIZE);
+    retrieved_val_1 = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
+    retrieved_val_2 = cache_get(cache1, KEY2, &LARGEVAL_SIZE);
+    if (read_val(retrieved_val_1) == read_val(retrieved_val_2)) {
+        std::cout << "Collision handling failed. Expected stored values to be differ; in fact both stored values are " << read_val(retrieved_val_1) << ".";
+        return -1;
+    }
+
+    destroy_cache(cache1);
+    destroy_cache(cache2);
+
+    return 0;
+}
+
+int test_evictor() {
+    cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+
+    index_type largevals_per_cache = CACHE_SIZE / LARGEVAL_SIZE;
+    key_type activekey;
+    for (index_type i = 0; i <= largevals_per_cache; i++) {
+        activekey = make_str_of_defined_length(i + 2);
+        cache_set(cache1, activekey, LARGEVAL, LARGEVAL_SIZE);
+        delete[] activekey;
+    }
+
+    activekey = make_str_of_defined_length(2);
+    val_type retrieved_val = cache_get(cache1, activekey, &LARGEVAL_SIZE);
+    if (retrieved_val != NULL) {
+        std::cout << "Cache did not evict expected piece of memory under FIFO policy.\n";
+        delete[] activekey;
+        return -1;
+    }
+    delete[] activekey;
+
+    activekey = make_str_of_defined_length(3);
+    retrieved_val = cache_get(cache1, activekey, &LARGEVAL_SIZE);
+    if (read_val(retrieved_val) != read_val(LARGEVAL)) {
+        std::cout << "Cache evicted an unexpected piece of memory under FIFO policy.\n";
+        delete[] activekey;
+        return -1;
+    }
+    delete[] activekey;
+
+    //Test LRU evictor policy upon working out the bugs in FIFO test
+
+    destroy_cache(cache1);
+
     return 0;
 }
 
@@ -120,7 +180,7 @@ int test_cache_delete() {
 
     cache_set(cache1, KEY1, LARGEVAL, LARGEVAL_SIZE);
     retrieved_val = cache_get(cache1, KEY1, &LARGEVAL_SIZE);
-    if (read_val(retrieved_val) != read_val(LARGEEVAL)) {
+    if (read_val(retrieved_val) != read_val(LARGEVAL)) {
         std::cout << "Large value stored or retrieved incorrectly in delete test. Stored value: " << read_val(LARGEVAL) << "; retrieved value: " << read_val(retrieved_val) << ".\n";
         return -1;
     }
@@ -132,7 +192,9 @@ int test_cache_delete() {
         return -1;
     }
 
-    cache_delete(cache1, UNUSEDKEY);
+    cache_delete(cache1, UNUSEDKEY); //Make sure no error arises from destroying something nonexistent
+
+    destroy_cache(cache1);
 
     return 0;
 }
@@ -174,15 +236,17 @@ int test_cache_space_used() {
         return -1;
     }
 
+    destroy_cache(cache1);
+
     return 0;
 }
 
 int main() {
     int32_t error_pile = 0;
-    error_pile += test_create_cache();
+    error_pile += test_create_cache_and_destroy_cache();
+    error_pile += test_cache_set_and_get();
     error_pile += test_hasher();
     error_pile += test_evictor();
-    error_pile += test_cache_set_and_get();
     error_pile += test_cache_delete();
     error_pile += test_cache_space_used();
 
