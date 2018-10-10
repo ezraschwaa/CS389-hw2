@@ -15,7 +15,7 @@ constexpr Index INIT_HASH_TABLE_CAPACITY = static_cast<Index>(INIT_ENTRY_CAPACIT
 
 constexpr Index EMPTY = 0;
 constexpr Index DELETED = 1;
-constexpr Index HIGH_BIT = ~((~0)>>1);
+constexpr Index HIGH_BIT = (1<<(8*sizeof(Index) - 1));
 constexpr inline Index get_hash(Index key_hash) {
 	//we want to flag entries by setting their key_has to EMPTY and DELETED
 	//we need to modify the hash so that it can't equal EMPTY or DELETED
