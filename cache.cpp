@@ -27,7 +27,7 @@ constexpr inline Index get_step_size(Index key_hash) {
 	//the step size must be coprime with hash_table_capacity(a power of 2)
 	//so it must be odd(if it's not it could crash)
 	//we want the step size to have little relation with the initial index so we negate
-	return ~(key_hash<<2);
+	return ~((key_hash<<1)|HIGH_BIT);
 }
 
 
