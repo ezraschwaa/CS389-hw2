@@ -241,6 +241,21 @@ int test_cache_space_used() {
     return 0;
 }
 
+int test_resizing() {
+    cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+
+    const int ONE_MORE_THAN_CAPACITY = 129; //Should be enough to make the cache resize, or to throw an error if it fails
+
+    key_type activekey;
+    for (index_type i = 0; i < ONE_MORE_THAN_CAPACITY; i++) {
+        activekey = make_str_of_defined_length(i + 2);
+        cache_set(cache1, activekey, LARGEVAL, LARGEVAL_SIZE);
+        delete[] activekey;
+    }
+
+    destroy_cache(cache1);
+}
+
 int main() {
     int32_t error_pile = 0;
     error_pile += test_create_cache_and_destroy_cache();
@@ -249,6 +264,7 @@ int main() {
     error_pile += test_evictor();
     error_pile += test_cache_delete();
     error_pile += test_cache_space_used();
+    error_pile += test_resizing();
 
     delete[] SMALLVAL;
     delete[] LARGEVAL;
