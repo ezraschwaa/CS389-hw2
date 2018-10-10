@@ -15,11 +15,13 @@ constexpr Index INIT_HASH_TABLE_CAPACITY = static_cast<Index>(INIT_ENTRY_CAPACIT
 
 constexpr Index EMPTY = 0;
 constexpr Index DELETED = 1;
-constexpr Index HIGH_BIT = (1<<(8*sizeof(Index) - 1));
+constexpr Index HIGH_BIT = 1<<(8*sizeof(Index) - 1);
+constexpr char NULL_TERMINATOR = 0;
+constexpr Index HASH_MULTIPLIER = 2654435769;
 constexpr inline Index get_hash(Index key_hash) {
 	//we want to flag entries by setting their key_has to EMPTY and DELETED
 	//we need to modify the hash so that it can't equal EMPTY or DELETED
-	return key_hash|HIGH_BIT;
+	return 2*(key_hash*HASH_MULTIPLIER) + 1;
 }
 constexpr inline Index get_step_size(Index key_hash) {
 	//gets the step size for traversing the hash table
@@ -27,12 +29,8 @@ constexpr inline Index get_step_size(Index key_hash) {
 	//the step size must be coprime with hash_table_capacity(a power of 2)
 	//so it must be odd(if it's not it could crash)
 	//we want the step size to have little relation with the initial index so we negate
-	return ~((key_hash<<1)|HIGH_BIT);
+	return (key_hash<<1)|HIGH_BIT;
 }
-
-
-constexpr char NULL_TERMINATOR = 0;
-constexpr Index HASH_MULTIPLIER = 2654435769;
 Index get_key_size(const Key_ptr key) {
 	//always returns the size in bytes, includes the null terminator in the size
 	Index size = 0;
@@ -46,8 +44,7 @@ Index default_key_hasher(Key_ptr key) {
 	//generates a hash of a c string
 	Index i = 0;
 	Index size = get_key_size(key);
-	// Index hash = size*HASH_MULTIPLIER;
-	Index hash = 0;
+	Index hash = size*HASH_MULTIPLIER;
 	auto key_as_index = reinterpret_cast<const Index*>(key);
 	Index key_as_index_size = size/sizeof(Index);
 	for(; i < key_as_index_size; i += 1) {
