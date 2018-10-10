@@ -150,7 +150,7 @@ inline Index find_entry(const Cache* cache, const Key_ptr key) {
 	for(Index count = 0; count < hash_table_capacity; count += 1) {
 		auto cur_key_hash = key_hashes[expected_i];
 		if(cur_key_hash == EMPTY) {
-			break;
+			return KEY_NOT_FOUND;
 		} else if(cur_key_hash == DELETED) {
 			// continue;
 		} else if(cur_key_hash == key_hash) {
@@ -161,7 +161,7 @@ inline Index find_entry(const Cache* cache, const Key_ptr key) {
 		}
 		expected_i = (expected_i + step_size)%hash_table_capacity;
 	}
-	std::cout<<"Error when attempting to find entry in cache: index was %d, step was %d, key was %s, size was %d"<< expected_i<< step_size<< key<< hash_table_capacity;
+	printf("Error when attempting to find entry in cache: index was %d, step was %d, key was %s, size was %d\n", expected_i, step_size, key, hash_table_capacity);
 	return KEY_NOT_FOUND;
 }
 
