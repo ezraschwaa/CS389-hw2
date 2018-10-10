@@ -19,9 +19,10 @@ constexpr Index HIGH_BIT = 1<<(8*sizeof(Index) - 1);
 constexpr char NULL_TERMINATOR = 0;
 constexpr Index HASH_MULTIPLIER = 2654435769;
 constexpr inline Index get_hash(Index key_hash) {
-	//we want to flag entries by setting their key_has to EMPTY and DELETED
+	//we want to flag entries by setting their key_hash to EMPTY and DELETED
 	//we need to modify the hash so that it can't equal EMPTY or DELETED
-	return 2*(key_hash*HASH_MULTIPLIER) + 1;
+	//if we don't then everything will break
+	return key_hash|HIGH_BIT;
 }
 constexpr inline Index get_step_size(Index key_hash) {
 	//gets the step size for traversing the hash table
@@ -29,7 +30,7 @@ constexpr inline Index get_step_size(Index key_hash) {
 	//the step size must be coprime with hash_table_capacity(a power of 2)
 	//so it must be odd(if it's not it could crash)
 	//we want the step size to have little relation with the initial index so we negate
-	return (key_hash<<1)|HIGH_BIT;
+	return 2*(key_hash*HASH_MULTIPLIER) + 1;
 }
 Index get_key_size(const Key_ptr key) {
 	//always returns the size in bytes, includes the null terminator in the size
