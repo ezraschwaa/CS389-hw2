@@ -1,7 +1,6 @@
 //By Monica Moniot and Alyssa Riceman
 #include <stdlib.h>
 #include <cstring>
-#include <cassert>//--<--remove eventually
 #include <stdio.h>
 #include <iostream>
 #include "types.h"
@@ -16,8 +15,9 @@ constexpr Index INIT_HASH_TABLE_CAPACITY = static_cast<Index>(INIT_ENTRY_CAPACIT
 constexpr Index EMPTY = 0;
 constexpr Index DELETED = 1;
 constexpr Index HIGH_BIT = 1<<(8*sizeof(Index) - 1);
-constexpr char NULL_TERMINATOR = 0;
 constexpr Index HASH_MULTIPLIER = 2654435769;
+constexpr char NULL_TERMINATOR = 0;
+
 constexpr inline Index get_hash(Index key_hash) {
 	//we want to flag entries by setting their key_hash to EMPTY and DELETED
 	//we need to modify the hash so that it can't equal EMPTY or DELETED
@@ -26,13 +26,13 @@ constexpr inline Index get_hash(Index key_hash) {
 }
 constexpr inline Index get_step_size(Index key_hash) {
 	//gets the step size for traversing the hash table
-	//we are going to be doing double hashing
+	//we are going to be doing double hashing for our hash table
 	//the step size must be coprime with hash_table_capacity(a power of 2)
 	//so it must be odd(if it's not it could crash)
-	//we want the step size to have little relation with the initial index so we negate
+	//we want the step size to have little relation with the initial hash so we hash it
 	return 2*(key_hash*HASH_MULTIPLIER) + 1;
 }
-Index get_key_size(const Key_ptr key) {
+Index get_key_size(Key_ptr key) {
 	//always returns the size in bytes, includes the null terminator in the size
 	Index size = 0;
 	while(key[size] != NULL_TERMINATOR) {
@@ -43,21 +43,22 @@ Index get_key_size(const Key_ptr key) {
 }
 Index default_key_hasher(Key_ptr key) {
 	//generates a hash of a c string
+	//We are using David Knuth's multiplicative hash algorithm
 	Index i = 0;
 	Index size = get_key_size(key);
 	Index hash = size*HASH_MULTIPLIER;
 	auto key_as_index = reinterpret_cast<const Index*>(key);
 	Index key_as_index_size = size/sizeof(Index);
 	for(; i < key_as_index_size; i += 1) {
-		hash = hash^(key_as_index[i]*HASH_MULTIPLIER);
+		hash = (hash^key_as_index[i])*HASH_MULTIPLIER;
 	}
 	for(Index j = sizeof(Index)*key_as_index_size; j < size; j += 1) {
-		hash = hash^(key[j]*HASH_MULTIPLIER);
+		hash = (hash^key[j])*HASH_MULTIPLIER;
 	}
 	return hash;
 }
-bool are_keys_equal(const Key_ptr key0, const Key_ptr key1) {
-	//must be null terminated strings
+bool are_keys_equal(Key_ptr key0, Key_ptr key1) {
+	//must be null terminated strings or seg-fault
 	Index i = 0;
 	while(true) {
 		auto c0 = key0[i];
@@ -78,7 +79,7 @@ constexpr inline Index get_hash_table_capacity(Index entry_capacity) {
 }
 constexpr inline bool is_exceeding_load(Index entry_total, Index dead_total, Index entry_capacity) {
 	//when returns true triggers a table resizing
-	//we might seg-fault if entry_total exceeds entry_capacity
+	//we would seg-fault if entry_total exceeds entry_capacity
 	bool is_exceed_entry = entry_total >= entry_capacity;
 	bool is_exceed_load_factor = entry_total + dead_total > LOAD_FACTOR*get_hash_table_capacity(entry_capacity);
 	return is_exceed_entry or is_exceed_load_factor;
@@ -119,7 +120,7 @@ inline byte* allocate(Index entry_capacity, evictor_type policy) {
 	//a joint allocation is faster than many separate ones
 	//a joint allocation greatly improves locality
 	//we don't have to store pointers to every data structure
-	//a jointly allocate block is easily serializable
+	//a jointly allocated block is easily serializable
 	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
 	const auto hash_table_size = (2*sizeof(Index))*hash_table_capacity;
 	const auto book_size = sizeof(Page)*entry_capacity;
@@ -135,7 +136,7 @@ void mark_as_empty(Index* key_hashes, Index hash_table_capacity) {
 }
 
 constexpr Index KEY_NOT_FOUND = -1;
-inline Index find_entry(const Cache* cache, const Key_ptr key) {
+inline Index find_entry(Cache* cache, Key_ptr key) {
 	//gets the hash table index associated to key
 	const auto hash_table_capacity = get_hash_table_capacity(cache->entry_capacity);
 	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
@@ -159,14 +160,14 @@ inline Index find_entry(const Cache* cache, const Key_ptr key) {
 		}
 		expected_i = (expected_i + step_size)%hash_table_capacity;
 	}
-	printf("Error when attempting to find entry in cache: index was %d, step was %d, key was %s, size was %d\n", expected_i, step_size, key, hash_table_capacity);
+	printf("Error when attempting to find entry in cache: Full table traversal; index was %d, step was %d, key was %s, size was %d\n", expected_i, step_size, key, hash_table_capacity);
 	return KEY_NOT_FOUND;
 }
 
 inline void remove_entry(Cache* cache, Index i) {
 	//removes an entry to our cache, including from the hash table
 	//this is the only code that removes entries;
-	//it handles itself everything necessary for removing an entry
+	//it handles everything necessary for removing an entry
 	const auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
 	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
 	const auto entry_book = &cache->entry_book;
@@ -228,6 +229,7 @@ inline void grow_cache_size(Cache* cache) {
 	entry_book->pages = new_pages;
 	cache->evictor.mem_arena = new_evict_data;
 
+	//rehash our entries back into the new table
 	auto entries_left = cache->entry_total;
 	for(Index i = 0; entries_left <= 0; i += 1) {
 		auto key_hash = pre_key_hashes[i];
