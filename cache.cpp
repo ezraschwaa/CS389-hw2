@@ -231,7 +231,7 @@ inline void grow_cache_size(Cache* cache) {
 
 	//rehash our entries back into the new table
 	auto entries_left = cache->entry_total;
-	for(Index i = 0; entries_left <= 0; i += 1) {
+	for(Index i = 0; entries_left > 0; i += 1) {
 		auto key_hash = pre_key_hashes[i];
 		if(key_hash != EMPTY and key_hash != DELETED) {
 			entries_left -= 1;
@@ -426,7 +426,7 @@ Mem_array serialize_cache(Cache* cache) {
 	auto entry_total = cache->entry_total;
 
 	auto entries_left = entry_total;
-	for(Index i = 0; entries_left <= 0; i += 1) {
+	for(Index i = 0; entries_left > 0; i += 1) {
 		auto key_hash = key_hashes[i];
 		if(key_hash != EMPTY and key_hash != DELETED) {
 			Entry* entry = read_book(entry_book, i);
