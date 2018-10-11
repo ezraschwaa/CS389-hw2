@@ -444,11 +444,11 @@ Mem_array serialize_cache(Cache* cache) {
 	byte* mem_cache = static_cast<byte*>(ret.data);
 	Cache* cache_copy = static_cast<Cache*>(ret.data);
 	byte* mem_arena_copy = mem_cache + sizeof(Cache);
-	byte* mem_key_hashes = mem_arena_copy;
+	// byte* mem_key_hashes = mem_arena_copy;
 	byte* string_space = mem_cache + sizeof(Cache) + mem_arena_size;
 
 	memcpy(mem_cache, cache, sizeof(Cache));
-	mark_as_empty(reinterpret_cast<Index*>(mem_key_hashes), hash_table_capacity);
+	// mark_as_empty(reinterpret_cast<Index*>(mem_key_hashes), hash_table_capacity);
 	memcpy(mem_arena_copy, &cache->mem_arena, mem_arena_size);
 
 	//replace all pointers with relative pointers
@@ -494,22 +494,21 @@ Mem_array serialize_cache(Cache* cache) {
 cache_type deserialize_cache(Mem_array arr) {
 	byte* mem_cache = static_cast<byte*>(arr.data);
 	Cache* cache_copy = static_cast<Cache*>(arr.data);
+	byte* mem_arena_copy = mem_cache + sizeof(Cache);
 
 	const auto entry_capacity = cache_copy->entry_capacity;
 	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	const auto key_hashes = get_hashes(cache_copy->mem_arena, cache_copy->entry_capacity);
-	const auto bookmarks = get_bookmarks(cache_copy->mem_arena, cache_copy->entry_capacity);
+	const auto key_hashes = get_hashes(mem_arena_copy, entry_capacity);
+	const auto bookmarks = get_bookmarks(mem_arena_copy, entry_capacity);
 	const auto evictor = &cache_copy->evictor;
 
 	const auto hash_table_size = (2*sizeof(Index))*hash_table_capacity;
 	auto book_size = sizeof(Page)*entry_capacity;
 	auto evictor_size = get_evictor_mem_size(evictor->policy, entry_capacity);
 
-
 	auto mem_arena_size = hash_table_size + book_size + evictor_size;
 	// auto string_space_size = key_mem_size + value_mem_size;
 
-	byte* mem_arena_copy = mem_cache + sizeof(Cache);
 	byte* string_space = mem_cache + sizeof(Cache) + mem_arena_size;
 
 	Cache* new_cache = new Cache;
@@ -522,7 +521,7 @@ cache_type deserialize_cache(Mem_array arr) {
 	auto new_entry_book = &new_cache->entry_book;
 	new_cache->mem_arena = new_mem_arena;
 	new_entry_book->pages = get_pages(new_mem_arena, entry_capacity);
-	cache_copy->evictor.mem_arena = get_evict_data(new_mem_arena, entry_capacity);
+	new_cache->evictor.mem_arena = get_evict_data(new_mem_arena, entry_capacity);
 
 
 	auto entries_left = cache_copy->entry_total;
