@@ -4,6 +4,7 @@
 #include <cmath>
 #include <string>
 #include <memory>
+#include <cstdlib>
 #include "cache.h"
 #include "book.h"
 #include "eviction.h"
@@ -69,9 +70,7 @@ int test_create_cache_and_destroy_cache() {
     return 0;
 }
 
-int test_cache_set_and_get() {
-    cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-
+int test_cache_set_and_get(cache_type cache1) {
     cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
     val_type retrieved_val = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
     if (read_val(retrieved_val) != read_val(SMALLVAL)) {
@@ -92,78 +91,10 @@ int test_cache_set_and_get() {
         return -1;
     }
 
-    destroy_cache(cache1);
-
     return 0;
 }
 
-int test_hasher() {
-    cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    cache_type cache2 = create_cache(CACHE_SIZE, FIFO, &bad_hash_func);
-
-    cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
-    cache_set(cache1, KEY2, LARGEVAL, LARGEVAL_SIZE);
-    val_type retrieved_val_1 = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
-    val_type retrieved_val_2 = cache_get(cache1, KEY2, &LARGEVAL_SIZE);
-    if (read_val(retrieved_val_1) == read_val(retrieved_val_2)) {
-        std::cout << "Non-identical stored values are read as identical on retrieval with default hasher. Stored values: " << read_val(SMALLVAL) << ", " << read_val(LARGEVAL) << "; retrieved values: " << read_val(retrieved_val_1) << ", " << read_val(retrieved_val_2) << ".\n";
-        return -1;
-    }
-
-    cache_set(cache2, KEY1, SMALLVAL, SMALLVAL_SIZE);
-    cache_set(cache2, KEY2, LARGEVAL, LARGEVAL_SIZE);
-    retrieved_val_1 = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
-    retrieved_val_2 = cache_get(cache1, KEY2, &LARGEVAL_SIZE);
-    if (read_val(retrieved_val_1) == read_val(retrieved_val_2)) {
-        std::cout << "Collision handling failed. Expected stored values to be differ; in fact both stored values are " << read_val(retrieved_val_1) << ".";
-        return -1;
-    }
-
-    destroy_cache(cache1);
-    destroy_cache(cache2);
-
-    return 0;
-}
-
-int test_evictor() {
-    cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-
-    index_type largevals_per_cache = CACHE_SIZE / LARGEVAL_SIZE;
-    key_type activekey;
-    for (index_type i = 0; i <= largevals_per_cache; i++) {
-        activekey = make_str_of_defined_length(i + 2);
-        cache_set(cache1, activekey, LARGEVAL, LARGEVAL_SIZE);
-        delete[] activekey;
-    }
-
-    activekey = make_str_of_defined_length(2);
-    val_type retrieved_val = cache_get(cache1, activekey, &LARGEVAL_SIZE);
-    if (retrieved_val != NULL) {
-        std::cout << "Cache did not evict expected piece of memory under FIFO policy.\n";
-        delete[] activekey;
-        return -1;
-    }
-    delete[] activekey;
-
-    activekey = make_str_of_defined_length(3);
-    retrieved_val = cache_get(cache1, activekey, &LARGEVAL_SIZE);
-    if (read_val(retrieved_val) != read_val(LARGEVAL)) {
-        std::cout << "Cache evicted an unexpected piece of memory under FIFO policy.\n";
-        delete[] activekey;
-        return -1;
-    }
-    delete[] activekey;
-
-    //Test LRU evictor policy upon working out the bugs in FIFO test
-
-    destroy_cache(cache1);
-
-    return 0;
-}
-
-int test_cache_delete() {
-    cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-
+int test_cache_delete(cache_type cache1) {
     cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
     val_type retrieved_val = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
     if (read_val(retrieved_val) != read_val(SMALLVAL)) {
@@ -192,16 +123,12 @@ int test_cache_delete() {
         return -1;
     }
 
-    cache_delete(cache1, UNUSEDKEY); //Make sure no error arises from destroying something nonexistent
-
-    destroy_cache(cache1);
+    cache_delete(cache1, UNUSEDKEY); //Makes sure no error arises from destroying something nonexistent
 
     return 0;
 }
 
-int test_cache_space_used() {
-    cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-
+int test_cache_space_used(cache_type cache1) {
     const index_type space1 = cache_space_used(cache1);
     if (space1 != 0) {
         std::cout << "Cache was not initialized with 0 space used. Space filled on initialization: " << space1 << ".\n";
@@ -236,14 +163,59 @@ int test_cache_space_used() {
         return -1;
     }
 
-    destroy_cache(cache1);
+    return 0;
+}
+
+int test_hasher(cache_type cache1) {
+    cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
+    cache_set(cache1, KEY2, LARGEVAL, LARGEVAL_SIZE);
+    val_type retrieved_val_1 = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
+    val_type retrieved_val_2 = cache_get(cache1, KEY2, &LARGEVAL_SIZE);
+    if (read_val(retrieved_val_1) == read_val(retrieved_val_2))
+    {
+        std::cout << "Non-identical stored values are read as identical on retrieval. Stored values: " << read_val(SMALLVAL) << ", " << read_val(LARGEVAL) << "; retrieved values: " << read_val(retrieved_val_1) << ", " << read_val(retrieved_val_2) << ".\n";
+        return -1;
+    }
 
     return 0;
 }
 
-int test_resizing() {
-    cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+int test_evictor(cache_type cache1) {
+    index_type largevals_per_cache = CACHE_SIZE / LARGEVAL_SIZE;
+    key_type activekey;
+    for (index_type i = 0; i <= largevals_per_cache; i++)
+    {
+        activekey = make_str_of_defined_length(i + 2);
+        cache_set(cache1, activekey, LARGEVAL, LARGEVAL_SIZE);
+        delete[] activekey;
+    }
 
+    activekey = make_str_of_defined_length(2);
+    val_type retrieved_val = cache_get(cache1, activekey, &LARGEVAL_SIZE);
+    if (retrieved_val != NULL)
+    {
+        std::cout << "Cache did not evict expected piece of memory under FIFO policy.\n";
+        delete[] activekey;
+        return -1;
+    }
+    delete[] activekey;
+
+    activekey = make_str_of_defined_length(3);
+    retrieved_val = cache_get(cache1, activekey, &LARGEVAL_SIZE);
+    if (read_val(retrieved_val) != read_val(LARGEVAL))
+    {
+        std::cout << "Cache evicted an unexpected piece of memory under FIFO policy.\n";
+        delete[] activekey;
+        return -1;
+    }
+    delete[] activekey;
+
+    //Test LRU evictor policy upon working out the bugs in FIFO test
+
+    return 0;
+}
+
+int test_resizing(cache_type cache1) {
     const int ONE_MORE_THAN_CAPACITY = 129; //Should be enough to make the cache resize, or to throw an error if it fails
 
     key_type activekey;
@@ -252,19 +224,123 @@ int test_resizing() {
         cache_set(cache1, activekey, LARGEVAL, LARGEVAL_SIZE);
         delete[] activekey;
     }
+}
 
-    destroy_cache(cache1);
+int test_serialize(cache_type cache1) {
+    cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
+
+    Mem_array serialized = serialize_cache(cache1);
+    cache_type deserialized = deserialize_cache(serialized);
+
+    val_type retrieved_val = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
+    if (read_val(retrieved_val) != read_val(SMALLVAL)) {
+        std::cout << "Serialization or deserialization failed. Stored value before serialization: " << read_val(SMALLVAL) << "; retrieved value after deserialization: " << read_val(retrieved_val) << ".\n";
+        return -1;
+    }
+
+    destroy_cache(deserialized);
+
+    return 0;
+}
+
+int compositional_testing(uint32_t test_iters, uint32_t internal_iters) {
+    int32_t external_error_pile = 0;
+    for (uint32_t i = 0; i < test_iters; i++) {
+        evictor_type evictor; //Cycle through evictor types for tested caches
+        if (i % 2 == 0) {
+            evictor = FIFO;
+        } else {
+            evictor = LRU;
+        }
+
+        cache_type tested_cache; //Make cache, cycling through hash functions
+        if (i % 4 <= 1) {
+            tested_cache = create_cache(CACHE_SIZE, evictor, NULL);
+        } else {
+            tested_cache = create_cache(CACHE_SIZE, evictor, &bad_hash_func);
+        }
+
+        int32_t internal_error_pile = 0;
+
+        for (uint32_t j = 0; j < internal_iters; j++) { //Internal loop, runs a series of randomized tests on the cache
+            uint32_t next_test_to_run = (std::rand() % 6);
+            switch(j) {
+                case 0: 
+                    internal_error_pile += test_cache_set_and_get(tested_cache);
+                    break;
+                case 1: 
+                    internal_error_pile += test_cache_delete(tested_cache);
+                    break;
+                case 2: 
+                    internal_error_pile += test_cache_space_used(tested_cache);
+                    break;
+                case 3:
+                    internal_error_pile += test_hasher(tested_cache);
+                    break;
+                case 4:
+                    internal_error_pile += test_evictor(tested_cache);
+                    break;
+                case 5:
+                    internal_error_pile += test_resizing(tested_cache);
+                    break;
+            }
+        }
+
+        destroy_cache(tested_cache);
+
+        if (internal_error_pile < 0) { //Report state of cache when bugs came up
+            std::string evictor_debug;
+            std::string hasher_debug;
+            if (evictor == LRU) {
+                evictor_debug = "LRU";
+            } else {
+                evictor_debug = "FIFO";
+            }
+            if (i % 4 <= 1) {
+                hasher_debug = "the default hasher";
+            } else {
+                hasher_debug = "a user-input hasher";
+            }
+            std::cout << "The above " << (internal_error_pile * -1) << " errors occurred with an " << evictor_debug << "eviction policy and " << hasher_debug << ".";
+        }
+    }
+    return external_error_pile;
 }
 
 int main() {
     int32_t error_pile = 0;
-    error_pile += test_create_cache_and_destroy_cache();
-    error_pile += test_cache_set_and_get();
-    error_pile += test_hasher();
-    error_pile += test_evictor();
-    error_pile += test_cache_delete();
-    error_pile += test_cache_space_used();
-    error_pile += test_resizing();
+
+    // error_pile += test_create_cache_and_destroy_cache();
+
+    cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    // error_pile += test_cache_set_and_get(cache1);
+    // destroy_cache(cache1);
+
+    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    // error_pile += test_cache_delete(cache1);
+    // destroy_cache(cache1);
+
+    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    // error_pile += test_cache_space_used(cache1);
+    // destroy_cache(cache1);
+
+    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    // error_pile += test_hasher(cache1);
+    // destroy_cache(cache1);
+
+    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    error_pile += test_evictor(cache1);
+    destroy_cache(cache1);
+
+    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    // error_pile += test_resizing(cache1);
+    // destroy_cache(cache1);
+
+    cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    error_pile += test_serialize(cache1);
+    destroy_cache(cache1);
+
+    // error_pile += compositional_testing(16, 20);
 
     delete[] SMALLVAL;
     delete[] LARGEVAL;
