@@ -263,7 +263,7 @@ int compositional_testing(uint32_t test_iters, uint32_t internal_iters) {
         int32_t internal_error_pile = 0;
 
         for (uint32_t j = 0; j < internal_iters; j++) { //Internal loop, runs a series of randomized tests on the cache
-            uint32_t next_test_to_run = (std::rand() % 6);
+            uint32_t next_test_to_run = (std::rand() % 7);
             switch(j) {
                 case 0: 
                     internal_error_pile += test_cache_set_and_get(tested_cache);
@@ -282,6 +282,9 @@ int compositional_testing(uint32_t test_iters, uint32_t internal_iters) {
                     break;
                 case 5:
                     internal_error_pile += test_resizing(tested_cache);
+                    break;
+                case 6:
+                    internal_error_pile += test_serialize(tested_cache);
                     break;
             }
         }
@@ -310,37 +313,37 @@ int compositional_testing(uint32_t test_iters, uint32_t internal_iters) {
 int main() {
     int32_t error_pile = 0;
 
-    // error_pile += test_create_cache_and_destroy_cache();
+    error_pile += test_create_cache_and_destroy_cache();
 
     cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    // error_pile += test_cache_set_and_get(cache1);
-    // destroy_cache(cache1);
+    error_pile += test_cache_set_and_get(cache1);
+    destroy_cache(cache1);
 
-    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    // error_pile += test_cache_delete(cache1);
-    // destroy_cache(cache1);
+    cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    error_pile += test_cache_delete(cache1);
+    destroy_cache(cache1);
 
-    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    // error_pile += test_cache_space_used(cache1);
-    // destroy_cache(cache1);
+    cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    error_pile += test_cache_space_used(cache1);
+    destroy_cache(cache1);
 
-    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    // error_pile += test_hasher(cache1);
-    // destroy_cache(cache1);
+    cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    error_pile += test_hasher(cache1);
+    destroy_cache(cache1);
 
-    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
     error_pile += test_evictor(cache1);
     destroy_cache(cache1);
 
-    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    // error_pile += test_resizing(cache1);
-    // destroy_cache(cache1);
+    cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    error_pile += test_resizing(cache1);
+    destroy_cache(cache1);
 
     cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
     error_pile += test_serialize(cache1);
     destroy_cache(cache1);
 
-    // error_pile += compositional_testing(16, 20);
+    error_pile += compositional_testing(256, 500);
 
     delete[] SMALLVAL;
     delete[] LARGEVAL;
