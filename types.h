@@ -28,6 +28,7 @@ struct DLL {
 struct SLRU_data {
 	DLL protect;
 	DLL prohibate;
+	Index pp_delta;
 	bool protect_id;
 };
 

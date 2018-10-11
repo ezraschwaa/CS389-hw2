@@ -334,7 +334,8 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 			cache->dead_total -= 1;//we want to ressurect this entry
 			break;
 		} else if(cur_key_hash == key_hash) {
-			Entry* entry = read_book(entry_book, bookmarks[expected_i]);
+			auto bookmark = bookmarks[expected_i];
+			Entry* entry = read_book(entry_book, bookmark);
 			if(are_keys_equal(entry->key, key)) {//found key
 				update_mem_size(cache, val_size - entry->value_size);
 				//delete previous value
@@ -342,7 +343,7 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 				//add new value
 				entry->value = val_copy;
 				entry->value_size = val_size;
-				touch_evict_item(evictor, expected_i, &entry->evict_item, entry_book);
+				touch_evict_item(evictor, bookmark, &entry->evict_item, entry_book);
 				return;
 			}
 		}
@@ -444,11 +445,9 @@ Mem_array serialize_cache(Cache* cache) {
 	byte* mem_cache = static_cast<byte*>(ret.data);
 	Cache* cache_copy = static_cast<Cache*>(ret.data);
 	byte* mem_arena_copy = mem_cache + sizeof(Cache);
-	// byte* mem_key_hashes = mem_arena_copy;
 	byte* string_space = mem_cache + sizeof(Cache) + mem_arena_size;
 
 	memcpy(mem_cache, cache, sizeof(Cache));
-	// mark_as_empty(reinterpret_cast<Index*>(mem_key_hashes), hash_table_capacity);
 	memcpy(mem_arena_copy, &cache->mem_arena, mem_arena_size);
 
 	//replace all pointers with relative pointers
@@ -498,13 +497,13 @@ cache_type deserialize_cache(Mem_array arr) {
 
 	const auto entry_capacity = cache_copy->entry_capacity;
 	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	const auto key_hashes = get_hashes(mem_arena_copy, entry_capacity);
-	const auto bookmarks = get_bookmarks(mem_arena_copy, entry_capacity);
-	const auto evictor = &cache_copy->evictor;
+	const auto key_hashes_copy = get_hashes(mem_arena_copy, entry_capacity);
+	const auto bookmarks_copy = get_bookmarks(mem_arena_copy, entry_capacity);
+	const auto evictor_copy = &cache_copy->evictor;
 
 	const auto hash_table_size = (2*sizeof(Index))*hash_table_capacity;
 	auto book_size = sizeof(Page)*entry_capacity;
-	auto evictor_size = get_evictor_mem_size(evictor->policy, entry_capacity);
+	auto evictor_size = get_evictor_mem_size(evictor_copy->policy, entry_capacity);
 
 	auto mem_arena_size = hash_table_size + book_size + evictor_size;
 	// auto string_space_size = key_mem_size + value_mem_size;
@@ -517,7 +516,7 @@ cache_type deserialize_cache(Mem_array arr) {
 	memcpy(new_cache, cache_copy, sizeof(Cache));
 	memcpy(new_mem_arena, mem_arena_copy, mem_arena_size);
 
-	//replace all pointers with relative pointers
+	//replace all pointers with absolute pointers
 	auto new_entry_book = &new_cache->entry_book;
 	new_cache->mem_arena = new_mem_arena;
 	new_entry_book->pages = get_pages(new_mem_arena, entry_capacity);
@@ -526,27 +525,27 @@ cache_type deserialize_cache(Mem_array arr) {
 
 	auto entries_left = cache_copy->entry_total;
 	for(Index i = 0; entries_left <= 0; i += 1) {
-		auto key_hash = key_hashes[i];
+		auto key_hash = key_hashes_copy[i];
 		if(key_hash != EMPTY and key_hash != DELETED) {
 			entries_left -= 1;
-			auto bookmark = bookmarks[i];
-			Entry* entry_copy = read_book(new_entry_book, bookmark);
+			auto bookmark = bookmarks_copy[i];
+			Entry* new_entry = read_book(new_entry_book, bookmark);
 			{//copy key into memory
-				auto key = entry_copy->key;
+				auto key = new_entry->key;
 				Key_ptr actual_key = reinterpret_cast<Key_ptr>(&string_space[reinterpret_cast<uint_ptr>(key)]);
-				auto key_size = entry_copy->key_size;
+				auto key_size = new_entry->key_size;
 				auto new_key = new byte[key_size];
 				memcpy(new_key, actual_key, key_size);
-				//store a absolute pointer
-				entry_copy->key = reinterpret_cast<Key_ptr>(new_key);
+				//store a absolute pointer to the key
+				new_entry->key = reinterpret_cast<Key_ptr>(new_key);
 			}
 			{//copy value into memory
-				byte* actual_value = &string_space[reinterpret_cast<uint_ptr>(entry_copy->value)];
-				Index value_size = entry_copy->value_size;
+				byte* actual_value = &string_space[reinterpret_cast<uint_ptr>(new_entry->value)];
+				Index value_size = new_entry->value_size;
 				auto new_value = new byte[value_size];
 				memcpy(new_value, actual_value, value_size);
-				//store a absolute pointer
-				entry_copy->value = new_value;
+				//store a absolute pointer to the value
+				new_entry->value = new_value;
 			}
 		}
 	}

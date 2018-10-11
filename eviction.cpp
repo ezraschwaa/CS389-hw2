@@ -111,12 +111,13 @@ void create_evictor(Evictor* evictor, evictor_type policy) {
 		auto list = &evictor->data.list;
 		list->head = INVALID_NODE;
 	} else if(policy == SLRU) {
-		auto protect_id = &evictor->data.dlist.protect_id;
+		auto dlist = &evictor->data.dlist;
 		auto protect = &evictor->data.dlist.protect;
 		auto prohibate = &evictor->data.dlist.prohibate;
 		protect->head = INVALID_NODE;
 		prohibate->head = INVALID_NODE;
-		*protect_id = true;
+		dlist->protect_id = true;
+		dlist->pp_delta = 0;
 	} else {//RANDOM
 		evictor->data.rand_data.total_items = 0;
 	}
@@ -137,10 +138,11 @@ void add_evict_item    (Evictor* evictor, Bookmark item_i, Evict_item* item, Boo
 		node->rf_bit = false;
 		append(&evictor->data.list, item_i, node, book);
 	} else if(policy == SLRU) {
-		auto protect_id = evictor->data.dlist.protect_id;
+		auto dlist = &evictor->data.dlist;
 		auto prohibate = &evictor->data.dlist.prohibate;
 		auto node = &item->node;
-		node->rf_bit = !protect_id;
+		node->rf_bit = !dlist->protect_id;
+		dlist->pp_delta += 1;
 		append(prohibate, item_i, node, book);
 	} else {//RANDOM
 		auto data = &evictor->data.rand_data;
@@ -157,13 +159,15 @@ void remove_evict_item (Evictor* evictor, Bookmark item_i, Evict_item* item, Boo
 		auto node = &item->node;
 		remove(&evictor->data.list, item_i, node, book);
 	} else if(policy == SLRU) {
-		auto protect_id = evictor->data.dlist.protect_id;
+		auto dlist = &evictor->data.dlist;
 		auto protect = &evictor->data.dlist.protect;
 		auto prohibate = &evictor->data.dlist.prohibate;
 		auto node = &item->node;
-		if(node->rf_bit == protect_id) {
+		if(node->rf_bit == dlist->protect_id) {
+			dlist->pp_delta += 1;
 			remove(protect, item_i, node, book);
 		} else {
+			dlist->pp_delta -= 1;
 			remove(prohibate, item_i, node, book);
 		}
 	} else {//RANDOM
@@ -195,12 +199,13 @@ void touch_evict_item  (Evictor* evictor, Bookmark item_i, Evict_item* item, Boo
 		node->rf_bit = true;
 		set_last(&evictor->data.list, item_i, node, book);
 	} else if(policy == SLRU) {
-		auto protect_id = evictor->data.dlist.protect_id;
+		auto dlist = &evictor->data.dlist;
 		auto protect = &evictor->data.dlist.protect;
 		auto prohibate = &evictor->data.dlist.prohibate;
 		auto node = &item->node;
-		if(node->rf_bit != protect_id) {
-			node->rf_bit = protect_id;
+		if(node->rf_bit != dlist->protect_id) {
+			node->rf_bit = dlist->protect_id;
+			dlist->pp_delta -= 1;
 			remove(prohibate, item_i, node, book);
 		}
 		set_last(protect, item_i, node, book);
