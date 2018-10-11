@@ -448,7 +448,8 @@ Mem_array serialize_cache(Cache* cache) {
 	byte* string_space = mem_cache + sizeof(Cache) + mem_arena_size;
 
 	memcpy(mem_cache, cache, sizeof(Cache));
-	memcpy(mem_arena_copy, &cache->mem_arena, mem_arena_size);
+	// memset(mem_arena_copy, 'a', mem_arena_size);
+	memcpy(mem_arena_copy, cache->mem_arena, mem_arena_size);
 
 	//replace all pointers with relative pointers
 	auto entry_book_copy = &cache_copy->entry_book;
@@ -459,7 +460,7 @@ Mem_array serialize_cache(Cache* cache) {
 
 	Index string_space_end = 0;
 	entries_left = entry_total;
-	for(Index i = 0; entries_left <= 0; i += 1) {
+	for(Index i = 0; entries_left > 0; i += 1) {
 		auto key_hash = key_hashes[i];
 		if(key_hash != EMPTY and key_hash != DELETED) {
 			entries_left -= 1;
@@ -524,7 +525,7 @@ cache_type deserialize_cache(Mem_array arr) {
 
 
 	auto entries_left = cache_copy->entry_total;
-	for(Index i = 0; entries_left <= 0; i += 1) {
+	for(Index i = 0; entries_left > 0; i += 1) {
 		auto key_hash = key_hashes_copy[i];
 		if(key_hash != EMPTY and key_hash != DELETED) {
 			entries_left -= 1;
