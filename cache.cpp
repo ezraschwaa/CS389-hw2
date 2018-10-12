@@ -86,7 +86,7 @@ constexpr inline bool is_exceeding_load(Index entry_total, Index dead_total, Ind
 }
 
 //instead of storing pointers to our tables, we calculate them jit
-constexpr inline Index* get_hashes    (byte* mem_arena, Index entry_capacity) {
+constexpr inline Index* get_hashes    (byte* mem_arena) {
 	//hashes is part of the hash table
 	//in order to traverse the hash table, we traverse hashes
 	//the hash marks if an entry is empty, deleted or populated
@@ -140,7 +140,7 @@ inline Index find_entry(Cache* cache, Key_ptr key) {
 	//gets the hash table index associated to key
 	const auto hash_table_capacity = get_hash_table_capacity(cache->entry_capacity);
 	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
-	const auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
+	const auto key_hashes = get_hashes(cache->mem_arena);
 	const auto key_hash = get_hash(cache->hash(key));
 	const auto entry_book = &cache->entry_book;
 	//check if key is in cache
@@ -168,7 +168,7 @@ inline void remove_entry(Cache* cache, Index i) {
 	//removes an entry to our cache, including from the hash table
 	//this is the only code that removes entries;
 	//it handles everything necessary for removing an entry
-	const auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
+	const auto key_hashes = get_hashes(cache->mem_arena);
 	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
 	const auto entry_book = &cache->entry_book;
 	const auto evictor = &cache->evictor;
@@ -207,7 +207,7 @@ inline void grow_cache_size(Cache* cache) {
 	const auto new_capacity = 2*pre_capacity;
 
 	const auto pre_mem_arena = cache->mem_arena;
-	const auto pre_key_hashes = get_hashes(pre_mem_arena, pre_capacity);
+	const auto pre_key_hashes = get_hashes(pre_mem_arena);
 	const auto pre_bookmarks = get_bookmarks(pre_mem_arena, pre_capacity);
 	const auto pre_pages = get_pages(pre_mem_arena, pre_capacity);
 	const auto pre_evict_data = get_evict_data(pre_mem_arena, pre_capacity);
@@ -217,7 +217,7 @@ inline void grow_cache_size(Cache* cache) {
 	cache->mem_arena = new_mem_arena;
 	cache->entry_capacity = new_capacity;
 
-	const auto new_key_hashes = get_hashes(new_mem_arena, new_capacity);
+	const auto new_key_hashes = get_hashes(new_mem_arena);
 	const auto new_bookmarks = get_bookmarks(new_mem_arena, new_capacity);
 	const auto new_pages = get_pages(new_mem_arena, new_capacity);
 	const auto new_evict_data = get_evict_data(new_mem_arena, new_capacity);
@@ -276,16 +276,16 @@ Cache* create_cache(Index max_mem, evictor_type policy, Hash_func hash) {
 	}
 	auto mem_arena = allocate(entry_capacity, policy);
 	//make sure all entries are marked as EMPTY, so they can be populated
-	mark_as_empty(get_hashes(mem_arena, entry_capacity), get_hash_table_capacity(entry_capacity));
+	mark_as_empty(get_hashes(mem_arena), get_hash_table_capacity(entry_capacity));
 	cache->mem_arena = mem_arena;
-	create_book(&cache->entry_book, get_pages(mem_arena, entry_capacity), entry_capacity);
+	create_book(&cache->entry_book, get_pages(mem_arena, entry_capacity));
 	cache->evictor.mem_arena = get_evict_data(mem_arena, entry_capacity);
 	create_evictor(&cache->evictor, policy);
 	return cache;
 }
 void destroy_cache(Cache* cache) {
 	const auto hash_table_capacity = get_hash_table_capacity(cache->entry_capacity);
-	const auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
+	const auto key_hashes = get_hashes(cache->mem_arena);
 	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
 	const auto entry_book = &cache->entry_book;
 
@@ -314,7 +314,7 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 	}
 	const auto entry_capacity = cache->entry_capacity;
 	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	const auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
+	const auto key_hashes = get_hashes(cache->mem_arena);
 	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
 	auto entry_book = &cache->entry_book;
 	auto evictor = &cache->evictor;
@@ -412,7 +412,7 @@ Index cache_space_used(Cache* cache) {
 Mem_array serialize_cache(Cache* cache) {
 	const auto entry_capacity = cache->entry_capacity;
 	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	const auto key_hashes = get_hashes(cache->mem_arena, cache->entry_capacity);
+	const auto key_hashes = get_hashes(cache->mem_arena);
 	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
 	const auto entry_book = &cache->entry_book;
 	const auto evictor = &cache->evictor;
@@ -440,7 +440,7 @@ Mem_array serialize_cache(Cache* cache) {
 
 	Mem_array ret;
 	ret.size = sizeof(Cache) + mem_arena_size + string_space_size;
-	ret.data = new byte[sizeof(Cache) + mem_arena_size + string_space_size];//--allocation here
+	ret.data = new byte[ret.size];//--allocation here
 
 	byte* mem_cache = static_cast<byte*>(ret.data);
 	Cache* cache_copy = static_cast<Cache*>(ret.data);
@@ -498,7 +498,7 @@ cache_type deserialize_cache(Mem_array arr) {
 
 	const auto entry_capacity = cache_copy->entry_capacity;
 	const auto hash_table_capacity = get_hash_table_capacity(entry_capacity);
-	const auto key_hashes_copy = get_hashes(mem_arena_copy, entry_capacity);
+	const auto key_hashes_copy = get_hashes(mem_arena_copy);
 	const auto bookmarks_copy = get_bookmarks(mem_arena_copy, entry_capacity);
 	const auto evictor_copy = &cache_copy->evictor;
 

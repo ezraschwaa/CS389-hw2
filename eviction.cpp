@@ -166,7 +166,15 @@ void remove_evict_item (Evictor* evictor, Bookmark item_i, Evict_item* item, Boo
 			dlist->pp_delta += 1;
 			remove(protect, item_i, node, book);
 		} else {
-			dlist->pp_delta -= 1;
+			if(dlist->pp_delta == 0) {//evict from protected
+				auto p_item = protect->head;
+				auto p_node = get_node(book, p_item);
+				remove(protect, p_item, p_node, book);
+				append(prohibate, p_item, p_node, book);
+				dlist->pp_delta += 1;
+			} else {
+				dlist->pp_delta -= 1;
+			}
 			remove(prohibate, item_i, node, book);
 		}
 	} else {//RANDOM
@@ -249,6 +257,7 @@ Bookmark get_evict_item(Evictor* evictor, Book* book) {
 			auto p_node = get_node(book, p_item);
 			remove(protect, p_item, p_node, book);
 			append(prohibate, p_item, p_node, book);
+			dlist->pp_delta += 1;
 		} else {
 			dlist->pp_delta -= 1;
 		}

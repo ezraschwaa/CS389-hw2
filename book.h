@@ -13,7 +13,7 @@
 
 constexpr Bookmark INVALID_PAGE = -1;
 
-inline void create_book(Book* book, Page* pages, Bookmark size) {
+inline void create_book(Book* book, Page* pages) {
 	book->first_unused = INVALID_PAGE;
 	book->end = 0;
 	book->pages = pages;
