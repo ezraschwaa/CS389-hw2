@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <cstring>
 #include <stdio.h>
-#include <iostream>
 #include "types.h"
 #include "book.h"
 #include "eviction.h"

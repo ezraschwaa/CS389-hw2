@@ -1,6 +1,5 @@
 //By Monica Moniot and Alyssa Riceman
 #include <stdlib.h>
-#include <cstring>
 #include "eviction.h"
 #include "book.h"
 #include "types.h"
