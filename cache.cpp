@@ -8,7 +8,7 @@
 #include "eviction.h"
 #include "cache.h"
 
-constexpr Index INIT_ENTRY_CAPACITY = 128;//must be a power of 2
+constexpr Index INIT_ENTRY_CAPACITY = 64;//must be a power of 2
 constexpr double LOAD_FACTOR = .5;
 constexpr Index INIT_HASH_TABLE_CAPACITY = static_cast<Index>(INIT_ENTRY_CAPACITY/LOAD_FACTOR);
 
@@ -440,7 +440,7 @@ Mem_array serialize_cache(Cache* cache) {
 
 	Mem_array ret;
 	ret.size = sizeof(Cache) + mem_arena_size + string_space_size;
-	ret.data = new byte[ret.size];//--allocation here
+	ret.data = new byte[sizeof(Cache) + mem_arena_size + string_space_size];//--allocation here
 
 	byte* mem_cache = static_cast<byte*>(ret.data);
 	Cache* cache_copy = static_cast<Cache*>(ret.data);

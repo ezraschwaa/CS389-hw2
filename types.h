@@ -29,7 +29,6 @@ struct SLRU_data {
 	DLL protect;
 	DLL prohibate;
 	Index pp_delta;
-	bool protect_id;
 };
 
 struct Rand_data {
