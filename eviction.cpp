@@ -208,7 +208,7 @@ void touch_evict_item  (Evictor* evictor, Bookmark item_i, Evict_item* item, Boo
 			node->rf_bit = true;
 			remove(prohibate, item_i, node, book);
 			append(protect, item_i, node, book);
-			if(dlist->pp_delta <= 1) {
+			if(dlist->pp_delta <= 1) {//evict from protected
 				auto p_item = protect->head;
 				auto p_node = get_node(book, p_item);
 				remove(protect, p_item, p_node, book);
@@ -241,9 +241,10 @@ Bookmark get_evict_item(Evictor* evictor, Book* book) {
 		remove(list, item_i, node, book);
 	} else if(policy == SLRU) {
 		auto dlist = &evictor->data.dlist;
+		auto protect = &evictor->data.dlist.protect;
 		auto prohibate = &evictor->data.dlist.prohibate;
 		item_i = prohibate->head;
-		if(dlist->pp_delta == 0) {
+		if(dlist->pp_delta == 0) {//evict from protected
 			auto p_item = protect->head;
 			auto p_node = get_node(book, p_item);
 			remove(protect, p_item, p_node, book);
