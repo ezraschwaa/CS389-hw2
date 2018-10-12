@@ -3,8 +3,8 @@
 #include <iostream>
 #include <cmath>
 #include <string>
-#include <memory>
 #include <cstdlib>
+#include <ctime>
 #include "cache.h"
 #include "book.h"
 #include "eviction.h"
@@ -224,29 +224,35 @@ int test_resizing(cache_type cache1) {
         cache_set(cache1, activekey, LARGEVAL, LARGEVAL_SIZE);
         delete[] activekey;
     }
-}
-
-int test_serialize(cache_type cache1) {
-    cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
-
-    Mem_array serialized = serialize_cache(cache1);
-    cache_type deserialized = deserialize_cache(serialized);
-
-    val_type retrieved_val = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
-    if (read_val(retrieved_val) != read_val(SMALLVAL)) {
-        std::cout << "Serialization or deserialization failed. Stored value before serialization: " << read_val(SMALLVAL) << "; retrieved value after deserialization: " << read_val(retrieved_val) << ".\n";
-        return -1;
-    }
-
-    delete[] serialized.data;
-    destroy_cache(deserialized);
 
     return 0;
 }
 
+// int test_serialize(cache_type cache1) {
+//     cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
+
+//     Mem_array serialized = serialize_cache(cache1);
+//     cache_type deserialized = deserialize_cache(serialized);
+
+//     val_type retrieved_val = cache_get(cache1, KEY1, &SMALLVAL_SIZE);
+//     if (read_val(retrieved_val) != read_val(SMALLVAL)) {
+//         std::cout << "Serialization or deserialization failed. Stored value before serialization: " << read_val(SMALLVAL) << "; retrieved value after deserialization: " << read_val(retrieved_val) << ".\n";
+//         return -1;
+//     }
+
+//     delete[] serialized.data;
+//     destroy_cache(deserialized);
+
+//     return 0;
+// }
+
 int compositional_testing(uint32_t test_iters, uint32_t internal_iters) {
     int32_t external_error_pile = 0;
     for (uint32_t i = 0; i < test_iters; i++) {
+        // struct timespec time; //Seed randomizer with computer clock
+        // clock_gettime(CLOCK_MONOTONIC, &time);
+        // srand(time.tv_nsec);
+
         evictor_type evictor; //Cycle through evictor types for tested caches
         if (i % 2 == 0) {
             evictor = FIFO;
@@ -264,27 +270,24 @@ int compositional_testing(uint32_t test_iters, uint32_t internal_iters) {
         int32_t internal_error_pile = 0;
 
         for (uint32_t j = 0; j < internal_iters; j++) { //Internal loop, runs a series of randomized tests on the cache
-            uint32_t next_test_to_run = (std::rand() % 7);
-            switch(j) {
+            uint32_t next_test_to_run = (std::rand() % 6);
+            switch(next_test_to_run) {
                 case 0: 
                     internal_error_pile += test_cache_set_and_get(tested_cache);
                     break;
                 case 1: 
                     internal_error_pile += test_cache_delete(tested_cache);
                     break;
-                case 2: 
-                    internal_error_pile += test_cache_space_used(tested_cache);
-                    break;
-                case 3:
+                case 2:
                     internal_error_pile += test_hasher(tested_cache);
                     break;
-                case 4:
+                case 3:
                     internal_error_pile += test_evictor(tested_cache);
                     break;
-                case 5:
+                case 4:
                     internal_error_pile += test_resizing(tested_cache);
                     break;
-                case 6:
+                case 5:
                     // internal_error_pile += test_serialize(tested_cache);
                     break;
             }
@@ -306,7 +309,7 @@ int compositional_testing(uint32_t test_iters, uint32_t internal_iters) {
             } else {
                 hasher_debug = "a user-input hasher";
             }
-            std::cout << "The above " << (internal_error_pile * -1) << " errors occurred with an " << evictor_debug << "eviction policy and " << hasher_debug << ".";
+            std::cout << "The above " << (internal_error_pile * -1) << " errors occurred with an " << evictor_debug << "eviction policy and " << hasher_debug << ".\n";
         }
     }
     return external_error_pile;
@@ -315,41 +318,41 @@ int compositional_testing(uint32_t test_iters, uint32_t internal_iters) {
 int main() {
     int32_t error_pile = 0;
 
-    // error_pile += test_create_cache_and_destroy_cache();
+    error_pile += test_create_cache_and_destroy_cache();
 
     cache_type cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    // error_pile += test_cache_set_and_get(cache1);
-    // destroy_cache(cache1);
-
-    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    // error_pile += test_cache_delete(cache1);
-    // destroy_cache(cache1);
-
-    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    // error_pile += test_cache_space_used(cache1);
-    // destroy_cache(cache1);
-
-    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    // error_pile += test_hasher(cache1);
-    // destroy_cache(cache1);
-
-    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    // error_pile += test_evictor(cache1);
-    // destroy_cache(cache1);
-
-    // cache1 = create_cache(CACHE_SIZE, LRU, NULL);
-    // error_pile += test_evictor(cache1);
-    // destroy_cache(cache1);
-
-    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    // error_pile += test_resizing(cache1);
-    // destroy_cache(cache1);
-
-    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
-    error_pile += test_serialize(cache1);
+    error_pile += test_cache_set_and_get(cache1);
     destroy_cache(cache1);
 
-    // error_pile += compositional_testing(256, 500);
+    cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    error_pile += test_cache_delete(cache1);
+    destroy_cache(cache1);
+
+    cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    error_pile += test_cache_space_used(cache1);
+    destroy_cache(cache1);
+
+    cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    error_pile += test_hasher(cache1);
+    destroy_cache(cache1);
+
+    cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    error_pile += test_evictor(cache1);
+    destroy_cache(cache1);
+
+    cache1 = create_cache(CACHE_SIZE, LRU, NULL);
+    error_pile += test_evictor(cache1);
+    destroy_cache(cache1);
+
+    cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    error_pile += test_resizing(cache1);
+    destroy_cache(cache1);
+
+    // cache1 = create_cache(CACHE_SIZE, FIFO, NULL);
+    // error_pile += test_serialize(cache1);
+    // destroy_cache(cache1);
+
+    error_pile += compositional_testing(16, 20);
 
     delete[] SMALLVAL;
     delete[] LARGEVAL;
