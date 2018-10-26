@@ -289,7 +289,7 @@ void destroy_cache(Cache* cache) {
 	delete[] cache->mem_arena;
 	cache->mem_arena = NULL;
 	entry_book->pages = NULL;
-	delete cache;
+	// delete cache;
 }
 
 void cache_set(Cache* cache, Key_ptr key, Index key_size, Value_ptr val, Index val_size) {
