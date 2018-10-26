@@ -17,42 +17,42 @@ using evictor_type = Cache::evictor_type;
 // Helper Functions //
 //////////////////////
 
-// Helper function for generating strings of at least one "a"
-char* make_str_of_defined_length(index_type length) {
-    char* newstr = new char[length];
-    for(index_type i = 0; i < (length - 1); i++) {
-        newstr[i] = 'a';
-    }
-    newstr[length - 1] = 0;
-    return newstr;
-}
+// // Helper function for generating strings of at least one "a"
+// char* make_str_of_defined_length(index_type length) {
+//     char* newstr = new char[length];
+//     for(index_type i = 0; i < (length - 1); i++) {
+//         newstr[i] = 'a';
+//     }
+//     newstr[length - 1] = 0;
+//     return newstr;
+// }
 
-// Helper function for test_create_cache and test_hasher
-index_type bad_hash_func(const char* message) {
-    return message[0];
-}
+// // Helper function for test_create_cache and test_hasher
+// index_type bad_hash_func(const char* message) {
+//     return message[0];
+// }
 
-// Helper function for reading values
-std::string read_val(val_type value) {
-    const char* val_as_cstring = static_cast<const char*>(value);
-    std::string val_as_string(val_as_cstring);
-    return val_as_string;
-}
+// // Helper function for reading values
+// std::string read_val(val_type value) {
+//     const char* val_as_cstring = static_cast<const char*>(value);
+//     std::string val_as_string(val_as_cstring);
+//     return val_as_string;
+// }
 
 //////////////////////
 // Global variables //
 //////////////////////
 
 const index_type CACHE_SIZE = 4096;
-const index_type SMALL_CACHE_SIZE = 64;
-const index_type LARGE_CACHE_SIZE = (pow(2, 24));
-const key_type KEY1 = "43";
-const key_type KEY2 = "44";
-const key_type UNUSEDKEY = "bb";
-char* SMALLVAL = make_str_of_defined_length(2); //Vals can't be const because they need to be cast to void*
-index_type SMALLVAL_SIZE = 2; //Val sizes can't be const because cache_get requires a non-const val pointer
-char* LARGEVAL = make_str_of_defined_length(128);
-index_type LARGEVAL_SIZE = 128;
+// const index_type SMALL_CACHE_SIZE = 64;
+// const index_type LARGE_CACHE_SIZE = (pow(2, 24));
+// const key_type KEY1 = "43";
+// const key_type KEY2 = "44";
+// const key_type UNUSEDKEY = "bb";
+// char* SMALLVAL = make_str_of_defined_length(2); //Vals can't be const because they need to be cast to void*
+// index_type SMALLVAL_SIZE = 2; //Val sizes can't be const because cache_get requires a non-const val pointer
+// char* LARGEVAL = make_str_of_defined_length(128);
+// index_type LARGEVAL_SIZE = 128;
 
 ////////////////////
 // Test Functions //
@@ -60,6 +60,7 @@ index_type LARGEVAL_SIZE = 128;
 
 int test_create_cache_and_destroy_cache() { // No in-test potential errors, but if create or destroy returns error this will error accordingly
     Cache cache1(CACHE_SIZE, NULL, NULL);
+    auto num = cache1.space_used();
     // Cache cache2(SMALL_CACHE_SIZE, NULL, NULL);
     // Cache cache3(LARGE_CACHE_SIZE, NULL, NULL);
 
@@ -67,7 +68,7 @@ int test_create_cache_and_destroy_cache() { // No in-test potential errors, but 
     // destroy_cache(cache2);
     // destroy_cache(cache3);
 
-    return 0;
+    return num;
 }
 
 // int test_cache_set_and_get_one_val(cache_type cache1) {
@@ -435,8 +436,8 @@ int main() {
 
     // error_pile += compositional_testing(16, 20);
 
-    delete[] SMALLVAL;
-    delete[] LARGEVAL;
+    // delete[] SMALLVAL;
+    // delete[] LARGEVAL;
 
     if (error_pile < -1) {
         std::cout << "Errors remain.\n";
