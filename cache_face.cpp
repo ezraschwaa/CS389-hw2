@@ -1,5 +1,5 @@
-#include "cache.h"
 #include "cache.hh"
+#include "cache.h"
 
 
 using true_key_type = key_type;
