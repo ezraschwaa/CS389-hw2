@@ -14,8 +14,9 @@ cache: cache.o eviction.o
 	$(CPP) -O4 types.h book.h cache.o eviction.o tests.cc -o test;
 
 cache_debug: cache.o eviction.o cache_face.o
+	make clean;
 	$(CPP) -g types.h book.h cache.hh cache.h cache.o eviction.o cache_face.o tests.cc -o test;
-	# gdb ./test;
+	./test;
 
 clean:
 	rm -f *.o; rm -f *.h.gch; rm -f test
