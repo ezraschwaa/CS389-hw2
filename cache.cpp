@@ -7,7 +7,7 @@
 #include "eviction.h"
 #include "cache.h"
 
-constexpr Index INIT_ENTRY_CAPACITY = 64;//must be a power of 2
+constexpr Index INIT_ENTRY_CAPACITY = 32;//must be a power of 2
 constexpr double LOAD_FACTOR = .5;
 constexpr Index INIT_HASH_TABLE_CAPACITY = static_cast<Index>(INIT_ENTRY_CAPACITY/LOAD_FACTOR);
 
@@ -31,44 +31,30 @@ constexpr inline Index get_step_size(Index key_hash) {
 	//we want the step size to have little relation with the initial hash so we hash it
 	return 2*(key_hash*HASH_MULTIPLIER) + 1;
 }
-Index get_key_size(Key_ptr key) {
-	//always returns the size in bytes, includes the null terminator in the size
-	Index size = 0;
-	while(key[size] != NULL_TERMINATOR) {
-		size += 1;
-	}
-	size += 1;
-	return size;//must be in bytes
-}
-Index default_key_hasher(Key_ptr key) {
-	//generates a hash of a c string
+Index default_key_hasher(Key_ptr key, Index key_size) {
 	//We are using David Knuth's multiplicative hash algorithm
 	Index i = 0;
-	Index size = get_key_size(key);
-	Index hash = size*HASH_MULTIPLIER;
+	Index hash = key_size*HASH_MULTIPLIER;
 	auto key_as_index = reinterpret_cast<const Index*>(key);
-	Index key_as_index_size = size/sizeof(Index);
+	Index key_as_index_size = key_size/sizeof(Index);
 	for(; i < key_as_index_size; i += 1) {
 		hash = (hash^key_as_index[i])*HASH_MULTIPLIER;
 	}
-	for(Index j = sizeof(Index)*key_as_index_size; j < size; j += 1) {
+	for(Index j = sizeof(Index)*key_as_index_size; j < key_size; j += 1) {
 		hash = (hash^key[j])*HASH_MULTIPLIER;
 	}
 	return hash;
 }
-bool are_keys_equal(Key_ptr key0, Key_ptr key1) {
-	//must be null terminated strings or seg-fault
-	Index i = 0;
-	while(true) {
-		auto c0 = key0[i];
-		auto c1 = key1[i];
-		if(c0 != c1) {
-			return false;
-		} else if(c0 == NULL_TERMINATOR) {
-			return true;
-		}
-		i += 1;
+inline bool are_keys_equal(Key_ptr key0, Index key0_size, Key_ptr key1, Index key1_size) {
+	if(key0_size != key1_size) {
+		return false;
 	}
+	for(Index i = 0; i < key0_size; i += 1) {
+		if(key0[i] != key1[i]) {
+			return false;
+		}
+	}
+	return true;
 }
 
 
@@ -135,12 +121,12 @@ void mark_as_empty(Index* key_hashes, Index hash_table_capacity) {
 }
 
 constexpr Index KEY_NOT_FOUND = -1;
-inline Index find_entry(Cache* cache, Key_ptr key) {
+inline Index find_entry(Cache* cache, Key_ptr key, Index key_size) {
 	//gets the hash table index associated to key
 	const auto hash_table_capacity = get_hash_table_capacity(cache->entry_capacity);
 	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
 	const auto key_hashes = get_hashes(cache->mem_arena);
-	const auto key_hash = get_hash(cache->hash(key));
+	const auto key_hash = get_hash(cache->hash(key, key_size));
 	const auto entry_book = &cache->entry_book;
 	//check if key is in cache
 	Index expected_i = key_hash%hash_table_capacity;
@@ -153,7 +139,7 @@ inline Index find_entry(Cache* cache, Key_ptr key) {
 			// continue;
 		} else if(cur_key_hash == key_hash) {
 			Entry* entry = read_book(entry_book, bookmarks[expected_i]);
-			if(are_keys_equal(entry->key, key)) {//found key
+			if(are_keys_equal(entry->key, entry->key_size, key, key_size)) {//found key
 				return expected_i;
 			}
 		}
@@ -306,7 +292,7 @@ void destroy_cache(Cache* cache) {
 	delete cache;
 }
 
-void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
+void cache_set(Cache* cache, Key_ptr key, Index key_size, Value_ptr val, Index val_size) {
 	if(val_size > cache->mem_capacity) {
 		printf("Error in call to cache_set: Value exceeds max_mem, value was %d, max was %d", val_size, cache->mem_capacity);
 		return;
@@ -318,7 +304,7 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 	auto entry_book = &cache->entry_book;
 	auto evictor = &cache->evictor;
 
-	const auto key_hash = get_hash(cache->hash(key));
+	const auto key_hash = get_hash(cache->hash(key, key_size));
 
 	byte* val_copy = new byte[val_size];//we assume val_size is in bytes
 	memcpy(val_copy, val, val_size);
@@ -335,7 +321,7 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 		} else if(cur_key_hash == key_hash) {
 			auto bookmark = bookmarks[expected_i];
 			Entry* entry = read_book(entry_book, bookmark);
-			if(are_keys_equal(entry->key, key)) {//found key
+			if(are_keys_equal(entry->key, entry->key_size, key, key_size)) {//found key
 				update_mem_size(cache, val_size - entry->value_size);
 				//delete previous value
 				delete[] entry->value;
@@ -352,7 +338,6 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 
 	//add key at new_i
 	Key_ptr key_copy;
-	Index key_size = get_key_size(key);
 	{//copy key into key_copy
 		byte* key_mem = new byte[key_size];
 		memcpy(key_mem, key, key_size);
@@ -378,12 +363,12 @@ void cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 	}
 }
 
-Value_ptr cache_get(Cache* cache, Key_ptr key, Index* ret_val_size) {
+Value_ptr cache_get(Cache* cache, Key_ptr key, Index key_size, Index* ret_val_size) {
 	const auto bookmarks = get_bookmarks(cache->mem_arena, cache->entry_capacity);
 	const auto entry_book = &cache->entry_book;
 	const auto evictor = &cache->evictor;
 
-	Index i = find_entry(cache, key);
+	Index i = find_entry(cache, key, key_size);
 	if(i == KEY_NOT_FOUND) {
 		return NULL;
 	} else {
@@ -396,8 +381,8 @@ Value_ptr cache_get(Cache* cache, Key_ptr key, Index* ret_val_size) {
 	}
 }
 
-void cache_delete(Cache* cache, Key_ptr key) {
-	Index i = find_entry(cache, key);
+void cache_delete(Cache* cache, Key_ptr key, Index key_size) {
+	Index i = find_entry(cache, key, key_size);
 	if(i != KEY_NOT_FOUND) {
 		remove_entry(cache, i);
 	}

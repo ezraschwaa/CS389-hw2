@@ -17,7 +17,7 @@ typedef const void *val_type;
 typedef uint32_t index_type;
 
 // For a given key string, return a pseudo-random integer:
-typedef index_type (*hash_func)(key_type key);
+typedef index_type (*hash_func)(key_type key, index_type key_size);
 
 // User-defined type for an eviction policy. Unspecified by API.
 enum {//evictor_types
@@ -42,14 +42,14 @@ cache_type create_cache(index_type maxmem, evictor_type evictor, hash_func hashe
 // Both the key and the value are to be deep-copied (not just pointer copied).
 // If maxmem capacity is exceeded, sufficient values will be removed
 // from the cache to accomodate the new value.
-void cache_set(cache_type cache, key_type key, val_type val, index_type val_size);
+void cache_set(cache_type cache, key_type key, index_type key_size, val_type val, index_type val_size);
 
 // Retrieve a pointer to the value associated with key in the cache,
 // or NULL if not found.
-val_type cache_get(cache_type cache, key_type key, index_type *val_size);
+val_type cache_get(cache_type cache, key_type key, index_type key_size, index_type *val_size);
 
 // Delete an object from the cache, if it's still there
-void cache_delete(cache_type cache, key_type key);
+void cache_delete(cache_type cache, key_type key, index_type key_size);
 
 // Compute the total amount of memory used up by all cache values (not keys)
 index_type cache_space_used(cache_type cache);
