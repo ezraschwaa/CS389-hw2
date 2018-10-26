@@ -8,3 +8,5 @@ eviction.o
 book.h.gch
 test
 types.h.gch
+cache_face.o
+cache.hh.gch

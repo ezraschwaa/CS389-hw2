@@ -18,4 +18,4 @@ cache_debug: cache.o eviction.o cache_face.o
 	# gdb ./test;
 
 clean:
-	rm -f *.o; rm -f *.h.gch; rm test
+	rm -f *.o; rm -f *.h.gch; rm -f test
