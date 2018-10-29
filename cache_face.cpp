@@ -6,9 +6,7 @@ using true_key_type = key_type;
 
 struct Cache::Impl {
 };
-Cache::Cache(Cache::index_type maxmem, evictor_type evictor, hash_func hasher) : pImpl_(reinterpret_cast<Impl*>(create_cache(maxmem, LRU, NULL))) {
-
-}
+Cache::Cache(Cache::index_type maxmem, evictor_type evictor, hash_func hasher) : pImpl_(reinterpret_cast<Impl*>(create_cache(maxmem, LRU, NULL))) {}
 Cache::~Cache() {
 	auto cache = reinterpret_cast<cache_obj*>(pImpl_.get());
 	destroy_cache(cache);
