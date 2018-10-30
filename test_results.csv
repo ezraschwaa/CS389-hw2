@@ -1,0 +1,16 @@
+Short name,Function name,Test description,Result
+create,test_create_cache,cache constructor doesn't throw errors,PASS
+set_get_one_val,test_cache_set_and_get_one_val,can set and retrieve a value correctly,PASS
+set_get_two_vals_same_key,test_cache_set_and_get_two_vals_same_key,can correctly retrieve a value which has overwritten a previous value,PASS
+set_get_two_vals_diff_keys,test_cache_set_and_get_two_vals_diff_keys,"can, after setting values with two different keys, retrieve the one associated with the first key",PASS
+get_unassigned,test_cache_get_unassignedval,get will retrieve null value if getting key which was never set,PASS
+delete_one_val,test_cache_delete_one_val,get retrieves null value if del was previously run on the gotten key,PASS
+delete_two_vals_same_key,test_cache_delete_two_vals_same_key,"get retrieves null value if del was previously run on the gotten key, even if the gotten key had a previous value assigned to it which del wasn't run on",PASS
+delete_two_vals_diff_keys,test_cache_delete_two_vals_diff_keys,"get retrieves null value if del was previously run on the gotten key, even if a different key has a value assigned to it which del wasn't run on",PASS
+delete_unused,test_cache_delete_unusedval,delete doesn't throw an error if run on a key which never had a value assigned to it,PASS
+space_used_on_initialization,test_cache_space_used_on_initialization,caches are initialized with 0 space used,PASS
+space_used_one_val,test_cache_space_used_one_val,space used increases correctly when a value is input,PASS
+space_used_two_vals_same_key,test_cache_space_used_two_vals_same_key,"space used, if a key is written and overwritten, increases only by size of second value written",PASS
+space_used_two_vals_diff_keys,test_cache_space_used_two_vals_diff_keys,"if two keys are written, space used is the sum of the two written values",PASS
+space_used_deletion_one_val,test_cache_space_used_deletion_one_val,deleting the only value in the cache sets its space used to 0,PASS
+space_used_deletion_two_vals,test_cache_space_used_deletion_two_vals_diff_keys,deleting one value in a cache with more than one value reduces its space by the size of the deleted value,PASS

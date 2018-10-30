@@ -27,10 +27,10 @@ char* make_str_of_defined_length(index_type length) {
     return newstr;
 }
 
-// Helper function for test_create_cache and test_hasher
-index_type bad_hash_func(const char* message) {
-    return message[0];
-}
+// // Helper function for test_create_cache and test_hasher (deprecated)
+// index_type bad_hash_func(const char* message) {
+//     return message[0];
+// }
 
 // Helper function for reading values
 std::string read_val(val_type value) {
@@ -58,16 +58,16 @@ index_type LARGEVAL_SIZE = 128;
 // Test Functions //
 ////////////////////
 
-int test_create_cache_and_destroy_cache() { // No in-test potential errors, but if create or destroy returns error this will error accordingly
-    Cache cache1(CACHE_SIZE, NULL, NULL);
-    Cache cache2(SMALL_CACHE_SIZE, NULL, NULL);
-    Cache cache3(LARGE_CACHE_SIZE, NULL, NULL);
+int test_create_cache() { // No in-test potential errors, but if create or destroy returns error this will error accordingly
+    Cache cache1(CACHE_SIZE);
+    Cache cache2(SMALL_CACHE_SIZE);
+    Cache cache3(LARGE_CACHE_SIZE);
 
     return 0;
 }
 
 int test_cache_set_and_get_one_val() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     cache1.set(KEY1, SMALLVAL, SMALLVAL_SIZE);
     val_type retrieved_val = cache1.get(KEY1, SMALLVAL_SIZE);
     if (read_val(retrieved_val) != read_val(SMALLVAL)) {
@@ -79,7 +79,7 @@ int test_cache_set_and_get_one_val() {
 }
 
 int test_cache_set_and_get_two_vals_same_key() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     cache1.set(KEY1, SMALLVAL, SMALLVAL_SIZE);
     cache1.set(KEY1, LARGEVAL, LARGEVAL_SIZE);
     val_type retrieved_val = cache1.get(KEY1, LARGEVAL_SIZE);
@@ -92,12 +92,12 @@ int test_cache_set_and_get_two_vals_same_key() {
 }
 
 int test_cache_set_and_get_two_vals_diff_keys() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     cache1.set(KEY1, SMALLVAL, SMALLVAL_SIZE);
     cache1.set(KEY2, LARGEVAL, LARGEVAL_SIZE);
-    val_type retrieved_val = cache1.get(KEY2, LARGEVAL_SIZE);
-    if (read_val(retrieved_val) != read_val(LARGEVAL)) {
-        std::cout << "Value stored or retrieved incorrectly in two-vals different-key test. Stored value: " << read_val(LARGEVAL) << "; retrieved value: " << read_val(retrieved_val) << ".\n";
+    val_type retrieved_val = cache1.get(KEY1, LARGEVAL_SIZE);
+    if (read_val(retrieved_val) != read_val(SMALLVAL)) {
+        std::cout << "Value stored or retrieved incorrectly in two-vals different-key test. Stored value: " << read_val(SMALLVAL) << "; retrieved value: " << read_val(retrieved_val) << ".\n";
         return -1;
     }
 
@@ -105,7 +105,7 @@ int test_cache_set_and_get_two_vals_diff_keys() {
 }
 
 int test_cache_get_unassignedval() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     val_type retrieved_val = cache1.get(UNUSEDKEY, SMALLVAL_SIZE);
     if (retrieved_val != NULL) {
         std::cout << "Unassigned key had value initialized already assigned to it. Expected null pointer; received pointer to value " << read_val(retrieved_val) << ".\n";
@@ -116,7 +116,7 @@ int test_cache_get_unassignedval() {
 }
 
 int test_cache_delete_one_val() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     cache1.set(KEY1, SMALLVAL, SMALLVAL_SIZE);
     cache1.del(KEY1);
     val_type retrieved_val = cache1.get(KEY1, SMALLVAL_SIZE);
@@ -129,7 +129,7 @@ int test_cache_delete_one_val() {
 }
 
 int test_cache_delete_two_vals_same_key() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     cache1.set(KEY1, SMALLVAL, SMALLVAL_SIZE);
     cache1.set(KEY1, LARGEVAL, LARGEVAL_SIZE);
     cache1.del(KEY1);
@@ -143,7 +143,7 @@ int test_cache_delete_two_vals_same_key() {
 }
 
 int test_cache_delete_two_vals_diff_keys() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     cache1.set(KEY1, SMALLVAL, SMALLVAL_SIZE);
     cache1.set(KEY2, LARGEVAL, LARGEVAL_SIZE);
     cache1.del(KEY2);
@@ -157,14 +157,14 @@ int test_cache_delete_two_vals_diff_keys() {
 }
 
 int test_cache_delete_unusedval(){ //Makes sure no error arises from deleting something nonexistent
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     cache1.del(UNUSEDKEY);
 
     return 0;
 }
 
 int test_cache_space_used_on_initialization() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     const index_type space = cache1.space_used();
     if (space != 0) {
         std::cout << "Cache was not initialized with 0 space used. Space filled on initialization: " << space << ".\n";
@@ -175,7 +175,7 @@ int test_cache_space_used_on_initialization() {
 }
 
 int test_cache_space_used_one_val() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     cache1.set(KEY1, SMALLVAL, SMALLVAL_SIZE);
     const index_type space = cache1.space_used();
     if (space != SMALLVAL_SIZE) {
@@ -187,7 +187,7 @@ int test_cache_space_used_one_val() {
 }
 
 int test_cache_space_used_two_vals_same_key() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     cache1.set(KEY1, SMALLVAL, SMALLVAL_SIZE);
     cache1.set(KEY1, LARGEVAL, LARGEVAL_SIZE);
     const index_type space = cache1.space_used();
@@ -200,7 +200,7 @@ int test_cache_space_used_two_vals_same_key() {
 }
 
 int test_cache_space_used_two_vals_diff_keys() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     cache1.set(KEY1, SMALLVAL, SMALLVAL_SIZE);
     cache1.set(KEY2, LARGEVAL, LARGEVAL_SIZE);
     const index_type space = cache1.space_used();
@@ -213,7 +213,7 @@ int test_cache_space_used_two_vals_diff_keys() {
 }
 
 int test_cache_space_used_deletion_one_val() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     cache1.set(KEY1, SMALLVAL, SMALLVAL_SIZE);
     cache1.del(KEY1);
     const index_type space = cache1.space_used();
@@ -226,7 +226,7 @@ int test_cache_space_used_deletion_one_val() {
 }
 
 int test_cache_space_used_deletion_two_vals_diff_keys() {
-    Cache cache1(CACHE_SIZE, NULL, NULL);
+    Cache cache1(CACHE_SIZE);
     cache1.set(KEY1, SMALLVAL, SMALLVAL_SIZE);
     cache1.set(KEY2, LARGEVAL, LARGEVAL_SIZE);
     cache1.del(KEY2);
@@ -397,7 +397,7 @@ int test_cache_space_used_deletion_two_vals_diff_keys() {
 int main() {
     int32_t error_pile = 0;
 
-    error_pile += test_create_cache_and_destroy_cache();
+    error_pile += test_create_cache();
     error_pile += test_cache_set_and_get_one_val();
     error_pile += test_cache_set_and_get_two_vals_same_key();
     error_pile += test_cache_set_and_get_two_vals_diff_keys();
