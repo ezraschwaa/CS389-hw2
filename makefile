@@ -1,5 +1,5 @@
 
-CPP = g++
+CPP = g++-7
 
 cache.o:
 	$(CPP) -c cache.h cache.cpp;
