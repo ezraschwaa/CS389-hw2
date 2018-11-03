@@ -7,11 +7,8 @@ cache.o:
 eviction.o:
 	$(CPP) -c eviction.h eviction.cpp;
 
-cache: cache.o eviction.o
-	$(CPP) -O4 types.h book.h cache.o eviction.o tests.cc -o test;
-
-cache_debug: cache.o eviction.o
-	$(CPP) -g types.h book.h cache.o eviction.o tests.cc -o test;
+cache:
+	$(CPP) -g types.h book.h cache.cc eviction.cc -o test tests.cc;
 	gdb ./test;
 
 clean:
