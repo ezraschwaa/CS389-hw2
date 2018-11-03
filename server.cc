@@ -1,11 +1,12 @@
 //By Monica Moniot and Alyssa Riceman
 #include "cache.h"
-#include <unistd.h>
 #include <stdio.h>
-#include <sys/socket.h>
 #include <stdlib.h>
-#include <netinet/in.h>
 #include <string.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 using byte = uint8_t;//this must have the size of a unit of memory (a byte)
 using uint_ptr = uint64_t;//this must have the size of a pointer
@@ -13,18 +14,76 @@ using uint_ptr = uint64_t;//this must have the size of a pointer
 using Cache = cache_obj;
 using Key_ptr = key_type;
 using Value_ptr = val_type;
-using uint32 = index_type;
+using uint = index_type;
 using Hash_func = hash_func;
 
 
-constexpr int PORT = 8765;
+constexpr uint DEFAULT_PORT = 33052;
+constexpr uint DEFAULT_MAX_MEMORY = 1<<12;
+constexpr uint MAX_MESSAGE_SIZE = 1<<10;
+constexpr uint HIGH_BIT = 1<<(8*sizeof(uint) - 1);
+constexpr uint MAX_MAX_MEMORY = ~HIGH_BIT;
 
-int main(int argc, char const *argv[])
+
+// "GET /key/k\n\n"
+int main(int argc, char** argv)
 {
-	uint32 server_fd;
-	uint32 addrlen;
+	uint port = DEFAULT_PORT;
+	uint max_mem = DEFAULT_MAX_MEMORY;
+	{
+		char* port_arg = NULL;
+		char* max_mem_arg = NULL;
+		opterr = 0;
+		auto c = getopt(argc, argv, "mt:");
+		while(c != -1) {
+			printf("%d\n", c);
+			switch (c) {
+			case 'm':
+				max_mem_arg = optarg;
+				break;
+			case 't':
+				port_arg = optarg;
+				break;
+			case '?':
+				if(optopt == 'm') {
+					fprintf(stderr, "Option -%c requires a maxmem value.\n", optopt);
+				} else if(optopt == 't') {
+					fprintf(stderr, "Option -%c requires a port number.\n", optopt);
+				} else if(isprint(optopt)) {
+					fprintf(stderr, "Unknown option `-%c'.\n", optopt);
+				} else {
+					fprintf(stderr, "Unknown option character `\\x%x'.\n", optopt);
+					return 1;
+				}
+			default:
+				perror("bad args");
+				return -1;
+			}
+			c = getopt(argc, argv, "abc:");
+		}
+		if(max_mem_arg) {
+			auto user_max_mem = strtoul(max_mem_arg, NULL, 0);
+			if(user_max_mem > 0 and user_max_mem <= MAX_MAX_MEMORY) {
+				max_mem = user_max_mem;
+				printf("1 %d\n", max_mem);
+			} else {
+				fprintf(stderr, "Option -m requires a valid memory size.\n");
+			}
+		}
+		if(port_arg) {
+			auto user_port = strtoul(port_arg, NULL, 0);
+			if(user_port > 0 and user_port < 65535) {
+				port = user_port;
+				printf("2 %d\n", port);
+			} else {
+				fprintf(stderr, "Option -t requires a valid port no.\n");
+			}
+		}
+	}
+
+	uint server_fd;
+	uint addrlen;
 	sockaddr_in address;
-	byte buffer[1024];
 	{
 		addrlen = sizeof(address);
 
@@ -36,7 +95,7 @@ int main(int argc, char const *argv[])
 		}
 
 		// Forcefully attaching socket to the port
-		uint32 opt = 1;
+		uint opt = 1;
 		bool failure = setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
 		if(failure) {
 			perror("setsockopt");
@@ -44,7 +103,7 @@ int main(int argc, char const *argv[])
 		}
 		address.sin_family = AF_INET;
 		address.sin_addr.s_addr = INADDR_ANY;
-		address.sin_port = htons(PORT);
+		address.sin_port = htons(port);
 
 		// Forcefully attaching socket to the port
 		auto error_code = bind(server_fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
@@ -60,8 +119,9 @@ int main(int argc, char const *argv[])
 	}
 
 
+	byte buffer[MAX_MESSAGE_SIZE];
 	while(true) {
-		uint32 new_socket = accept(server_fd, reinterpret_cast<sockaddr*>(&address), reinterpret_cast<socklen_t*>(&addrlen));
+		uint new_socket = accept(server_fd, reinterpret_cast<sockaddr*>(&address), reinterpret_cast<socklen_t*>(&addrlen));
 		if(new_socket < 0) {
 			perror("accept");
 			return -1;
@@ -69,7 +129,7 @@ int main(int argc, char const *argv[])
 
 		const char* hello = "hello world";
 
-		uint32 val_read = read(new_socket , buffer, 1024);
+		uint val_read = read(new_socket , buffer, MAX_MESSAGE_SIZE);
 		printf("%s\n", buffer);
 
 		send(new_socket, hello, strlen(hello), 0);
