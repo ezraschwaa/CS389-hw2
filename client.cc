@@ -17,11 +17,10 @@ int main() {
 
     sockaddr_in serverAddress;
     serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = PORTNO;
+    serverAddress.sin_port = htons(PORTNO);
     inet_pton(AF_INET, ipAddress, &serverAddress.sin_addr.s_addr);
 
     const sockaddr *addressPointer = reinterpret_cast<const sockaddr*>(&serverAddress);
     int connectionSuccess = connect(clientSocket, addressPointer, sizeof(serverAddress));
-    std::cout << connectionSuccess << "\n";
     assert(connectionSuccess == 0 && "Connection failed.");
 }
