@@ -45,17 +45,34 @@ Index default_key_hasher(Key_ptr key) {
 	//generates a hash of a c string
 	//We are using David Knuth's multiplicative hash algorithm
 	Index i = 0;
-	Index size = get_key_size(key);
-	Index hash = size*HASH_MULTIPLIER;
-	auto key_as_index = reinterpret_cast<const Index*>(key);
-	Index key_as_index_size = size/sizeof(Index);
-	for(; i < key_as_index_size; i += 1) {
-		hash = (hash^key_as_index[i])*HASH_MULTIPLIER;
+	Index hash = 0;
+	byte byte0;
+	byte byte8;
+	byte byte16;
+	byte byte24;
+	while(true) {
+		byte0 = key[i];
+		i += 1;
+		if(byte0 == NULL_TERMINATOR) {
+			return hash^(i*HASH_MULTIPLIER);
+		};
+		byte8 = key[i];
+		byte16 = 0;
+		byte24 = 0;
+		i += 1;
+		if(byte8 == NULL_TERMINATOR) break;
+		byte16 = key[i];
+		i += 1;
+		if(byte16 == NULL_TERMINATOR) break;
+		byte24 = key[i];
+		i += 1;
+		if(byte24 == NULL_TERMINATOR) break;
+		Index full = (byte24 << 24)|(byte16 << 16)|(byte8 << 8)|(byte0);
+		hash = hash^(full*HASH_MULTIPLIER);
 	}
-	for(Index j = sizeof(Index)*key_as_index_size; j < size; j += 1) {
-		hash = (hash^key[j])*HASH_MULTIPLIER;
-	}
-	return hash;
+	Index full = (byte24 << 24)|(byte16 << 16)|(byte8 << 8)|(byte0);
+	hash = hash^(full*HASH_MULTIPLIER);
+	return hash^(i*HASH_MULTIPLIER);
 }
 bool are_keys_equal(Key_ptr key0, Key_ptr key1) {
 	//must be null terminated strings or seg-fault
