@@ -199,7 +199,7 @@ inline void remove_entry(Cache* cache, Index i) {
 	cache->entry_total -= 1;
 	cache->dead_total += 1;
 
-	cache->mem_total -= entry->value_size;
+	cache->mem_total -= entry->value_size + entry->key_size;
 	delete[] entry->value;
 	entry->value = NULL;
 
@@ -356,14 +356,14 @@ int cache_set(Cache* cache, Key_ptr key, Value_ptr val, Index val_size) {
 			auto bookmark = bookmarks[expected_i];
 			Entry* entry = read_book(entry_book, bookmark);
 			if(are_keys_equal(entry->key, key)) {//found key
-				update_mem_size(cache, total_size - entry->value_size);
+				update_mem_size(cache, val_size - entry->value_size);
 				//delete previous value
 				delete[] entry->value;
 				//add new value
 				entry->value = val_copy;
 				entry->value_size = val_size;
 				touch_evict_item(evictor, bookmark, &entry->evict_item, entry_book);
-				return 0;
+				return 1;
 			}
 		}
 		expected_i = (expected_i + step_size)%hash_table_capacity;
