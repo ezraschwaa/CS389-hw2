@@ -134,13 +134,13 @@ int main(int argc, char** argv) {
 		}
 
 		sockaddr_in address_in;
-		uint adress_in_size = sizeof(address_in);
+		uint address_in_size = sizeof(address_in);
 		address_in.sin_family = AF_INET;
 		address_in.sin_addr.s_addr = INADDR_ANY;
 		address_in.sin_port = htons(port);
 
 		address = reinterpret_cast<sockaddr*>(&address_in);
-		adress_size = reinterpret_cast<socklen_t*>(&adress_in_size);
+		address_size = reinterpret_cast<socklen_t*>(&address_in_size);
 
 		// Forcefully attaching socket to the port
 		auto error_code = bind(server_fd, address, sizeof(address_in));
