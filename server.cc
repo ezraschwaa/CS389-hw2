@@ -6,12 +6,11 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <time.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 using byte = uint8_t;//this must have the size of a unit of memory (a byte)
-using uint64 = uint64_t;//this must have the size of a pointer
-
+using uint64 = uint64_t;
 using Cache = cache_obj;
 using Key_ptr = key_type;
 using Value_ptr = val_type;
@@ -20,10 +19,18 @@ using Hash_func = hash_func;
 
 
 constexpr uint DEFAULT_PORT = 33052;
-constexpr uint DEFAULT_MAX_MEMORY = 1<<12;
+constexpr uint DEFAULT_MAX_MEMORY = 1<<30;
 constexpr uint MAX_MESSAGE_SIZE = 1<<10;
 constexpr uint HIGH_BIT = 1<<(8*sizeof(uint) - 1);
 constexpr uint MAX_MAX_MEMORY = ~HIGH_BIT;
+
+const char* ACCEPTED    = "HTTP/1.1 200";
+const char* CREATED     = "HTTP/1.1 201";
+const char* BAD_REQUEST = "HTTP/1.1 400";
+const char* TOO_LARGE   = "HTTP/1.1 413";
+const char* NOT_ALLOWED = "HTTP/1.1 405";
+const char* NOT_FOUND   = "HTTP/1.1 404";
+
 
 constexpr uint64 str_to_uint(const char* const w, const uint size) {
 	uint64 ret = 0;
@@ -53,16 +60,6 @@ inline void write_uint_to(char* buffer, uint i) {
 }
 
 
-const char* ACCEPTED = "HTTP/1.1 200";
-const char* CREATED = "HTTP/1.1 201";
-const char* BAD_REQUEST = "HTTP/1.1 400";
-const char* NOT_FOUND = "HTTP/1.1 404";
-const char* TOO_LARGE = "HTTP/1.1 413";
-const char* NOT_ALLOWED = "HTTP/1.1 405";
-
-
-
-// "GET /key/k\n\n"
 int main(int argc, char** argv) {
 	uint port = DEFAULT_PORT;
 	uint max_mem = DEFAULT_MAX_MEMORY;
@@ -117,12 +114,10 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	uint server_fd;
-	uint addrlen;
-	sockaddr_in address;
+	uint64 server_fd;
+	sockaddr* address;
+	socklen_t* adress_size;
 	{
-		addrlen = sizeof(address);
-
 		// Creating socket file descriptor
 		server_fd = socket(AF_INET, SOCK_STREAM, 0);
 		if(server_fd == 0) {
@@ -137,12 +132,18 @@ int main(int argc, char** argv) {
 			perror("setsockopt");
 			return -1;
 		}
-		address.sin_family = AF_INET;
-		address.sin_addr.s_addr = INADDR_ANY;
-		address.sin_port = htons(port);
+
+		sockaddr_in address_in;
+		uint adress_in_size = sizeof(address_in);
+		address_in.sin_family = AF_INET;
+		address_in.sin_addr.s_addr = INADDR_ANY;
+		address_in.sin_port = htons(port);
+
+		address = reinterpret_cast<sockaddr*>(&address_in);
+		adress_size = reinterpret_cast<socklen_t*>(&adress_in_size);
 
 		// Forcefully attaching socket to the port
-		auto error_code = bind(server_fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
+		auto error_code = bind(server_fd, address, sizeof(address_in));
 		if(error_code < 0) {
 			perror("bind failed");
 			return -1;
@@ -155,19 +156,19 @@ int main(int argc, char** argv) {
 	}
 
 	auto cache = create_cache(max_mem, NULL);//we could have written this to the stack to avoid compulsory cpu misses
-	auto is_unset = true;
+	bool is_unset = true;
 
 	//-----------------------
 	//NOTE: BUFFER OVERFLOW DANGER, all writes to either buffer must be provably safe(can't overflow buffer)
-	char message_buffer[MAX_MESSAGE_SIZE];
-	char full_buffer[MAX_MESSAGE_SIZE + strlen(ACCEPTED) + 1];
+	char message_buffer[MAX_MESSAGE_SIZE + 1];
+	char full_buffer[MAX_MESSAGE_SIZE + strlen(ACCEPTED) + 2*sizeof(uint)];
 	memcpy(full_buffer, ACCEPTED, strlen(ACCEPTED));
 	full_buffer[strlen(ACCEPTED)] = ' ';
 	char* buffer = &full_buffer[strlen(ACCEPTED) + 1];
 	//-----------------------
 
 	while(true) {
-		uint new_socket = accept(server_fd, reinterpret_cast<sockaddr*>(&address), reinterpret_cast<socklen_t*>(&addrlen));
+		uint new_socket = accept(server_fd, address, address_size);
 		if(new_socket < 0) {
 			perror("accept");
 			return -1;
@@ -188,29 +189,29 @@ int main(int argc, char** argv) {
 				auto key = message;
 				uint key_size = get_item_size(key, message_size);
 				if(key_size > 0) {
-					uint buffer_size = 0;
-					write_uint_to(&buffer[buffer_size], key_size);
-					buffer_size += sizeof(uint);
-					memcpy(&buffer[buffer_size], key, key_size);
-					buffer_size += key_size;
-					buffer[buffer_size] = 0;//we're going to overwrite the null byte
-
+					key[key_size] = 0;//--<--
 					uint value_size;
 					auto value = cache_get(cache, &buffer[sizeof(uint)], &value_size);
 					if(value == NULL) {
 						response = NOT_FOUND;
 						response_size = strlen(NOT_FOUND);
-					} else if(buffer_size + sizeof(uint) + value_size >= MAX_MESSAGE_SIZE) {//shouldn't be possible
+					} else if(key_size + value_size >= MAX_MESSAGE_SIZE) {//shouldn't be possible
 						response = TOO_LARGE;
 						response_size = strlen(TOO_LARGE);
 					} else {
+						uint buffer_size = 0;
+						write_uint_to(&buffer[buffer_size], key_size);
+						buffer_size += sizeof(uint);
+						memcpy(&buffer[buffer_size], key, key_size);
+						buffer_size += key_size;
+
 						write_uint_to(&buffer[buffer_size], value_size);
 						buffer_size += sizeof(uint);
 						memcpy(&buffer[buffer_size], value, value_size);
 						buffer_size += value_size;
 
 						response = full_buffer;
-						response_size = buffer_size + strlen(ACCEPTED);
+						response_size = buffer_size + strlen(ACCEPTED) + 1;
 					}
 					is_bad_request = false;
 				}
@@ -220,7 +221,7 @@ int main(int argc, char** argv) {
 				if(message_size == 0) {
 					write_uint_to(buffer, cache_space_used(cache));
 					response = full_buffer;
-					response_size = sizeof(uint) + strlen(ACCEPTED);
+					response_size = sizeof(uint) + strlen(ACCEPTED) + 1;
 					is_bad_request = false;
 				}
 			}
@@ -237,13 +238,7 @@ int main(int argc, char** argv) {
 				auto value = message;
 				uint value_size = get_item_size(value, message_size);
 				if(key_size > 0 and value_size > 0) {
-					uint buffer_size = 0;
-
-					memcpy(&buffer[buffer_size], key, key_size);
-					key = &buffer[buffer_size];
-					buffer[buffer_size] = 0;
-					buffer_size += key_size + 1;
-
+					key[key_size] = 0;//--<--
 					auto code = cache_set(cache, key, value, value_size);
 					if(code < 0) {
 						response = TOO_LARGE;
@@ -254,7 +249,7 @@ int main(int argc, char** argv) {
 						response_size = strlen(CREATED);
 					} else {
 						response = ACCEPTED;
-						response_size = strlen(ACCEPTED) - 1;
+						response_size = strlen(ACCEPTED);
 					}
 					is_bad_request = false;
 				}
@@ -268,7 +263,7 @@ int main(int argc, char** argv) {
 				auto key = message;
 				uint key_size = get_item_size(key, message_size);
 
-				key[key_size] = 0;//--<--buffer
+				key[key_size] = 0;
 
 				if(key_size > 0) {
 					auto code = cache_delete(cache, key);
