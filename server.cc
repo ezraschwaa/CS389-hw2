@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
 
 	uint64 server_fd;
 	sockaddr* address;
-	socklen_t* adress_size;
+	socklen_t* address_size;
 	{
 		// Creating socket file descriptor
 		server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -281,14 +281,14 @@ int main(int argc, char** argv) {
 			message = &message[5];
 			message_size -= 5;
 			if(match_start(message, message_size, "/key/", 5)) {
-				uint buffer_size = 0;
-				tm tm;
-				gmtime_r(time(0), &tm);
-				buffer_size += strftime(buffer, MAX_MESSAGE_SIZE - buffer_size, "Date: %a, %d %b %Y %H:%M:%S %Z ", &tm);
-
-				response = ACCEPTED;
-				response_size = strlen(ACCEPTED);
-				is_bad_request = false;
+				// uint buffer_size = 0;
+				// tm tm;
+				// gmtime_r(time(0), &tm);
+				// buffer_size += strftime(buffer, MAX_MESSAGE_SIZE - buffer_size, "Date: %a, %d %b %Y %H:%M:%S %Z ", &tm);
+				//
+				// response = ACCEPTED;
+				// response_size = strlen(ACCEPTED);
+				// is_bad_request = false;
 			}
 		} else if(match_start(message, message_size, "POST ", 5)) {//may break in here
 			message = &message[5];
