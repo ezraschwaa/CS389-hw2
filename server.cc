@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <time.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -51,12 +52,59 @@ constexpr uint get_item_size(const char* const w, const uint total_size) {
 	uint i = 0;
 	for(; i < total_size; i += 1) {
 		auto c = w[i];
-		if(c == '/' or c == 0) break;
+		if(c == '/' or c == '\n') break;
+		if(c == 0) return 0;
 	}
 	return i;
 }
 inline void write_uint_to(char* buffer, uint i) {
 	*reinterpret_cast<uint*>(buffer) = i;
+}
+
+
+struct Socket {
+	uint64 file_desc;
+	sockaddr* address;
+	socklen_t* address_size;
+};
+// enum Protocol {
+// 	UPD = SOCK_STREAM,
+// 	TCP = SOCK_DGRAM,
+// };
+int create_socket(Socket* open_socket, uint p, uint port) {
+	// Creating socket file descriptor
+	uint64 server_fd = socket(AF_INET, p, 0);
+	if(server_fd == 0) {
+		return -1;
+	}
+
+	uint opt = 1;
+	bool failure = setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+	if(failure) {
+		return -1;
+	}
+
+	sockaddr_in address_in;
+	uint address_in_size = sizeof(address_in);
+	address_in.sin_family = AF_INET;
+	address_in.sin_addr.s_addr = INADDR_ANY;
+	address_in.sin_port = htons(port);
+
+	sockaddr* address = reinterpret_cast<sockaddr*>(&address_in);
+	socklen_t* address_size = reinterpret_cast<socklen_t*>(&address_in_size);
+
+	// Forcefully attaching socket to the port
+	auto error_code = bind(server_fd, address, sizeof(address_in));
+	if(error_code < 0) {
+		return -1;
+	}
+	error_code = listen(server_fd, 3);
+	if(error_code < 0) {
+		return -1;
+	}
+	open_socket->file_desc = server_fd;
+	open_socket->address = address;
+	open_socket->address_size = address_size;
 }
 
 
@@ -114,46 +162,23 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	uint64 server_fd;
-	sockaddr* address;
-	socklen_t* address_size;
-	{
-		// Creating socket file descriptor
-		server_fd = socket(AF_INET, SOCK_STREAM, 0);
-		if(server_fd == 0) {
-			perror("socket failed");
-			return -1;
-		}
+	Socket tcp_socket;
+	Socket udp_socket;
+	create_socket(&tcp_socket, SOCK_STREAM, port);
+	create_socket(&udp_socket, SOCK_DGRAM, port);
+	pollfd tcp_fd_;
+	tcp_fd_.fd = tcp_socket.file_desc;
+	tcp_fd_.events = POLLIN;
+	tcp_fd_.revents = 0;
+	pollfd udp_fd_;
+	udp_fd_.fd = udp_socket.file_desc;
+	udp_fd_.events = POLLIN;
+	udp_fd_.revents = 0;
+	uint file_desc_size = 2;
+	pollfd file_descs[2] = {tcp_fd_, udp_fd_};
+	pollfd* tcp_fd = &file_descs[0];
+	pollfd* udp_fd = &file_descs[1];
 
-		// Forcefully attaching socket to the port
-		uint opt = 1;
-		bool failure = setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
-		if(failure) {
-			perror("setsockopt");
-			return -1;
-		}
-
-		sockaddr_in address_in;
-		uint address_in_size = sizeof(address_in);
-		address_in.sin_family = AF_INET;
-		address_in.sin_addr.s_addr = INADDR_ANY;
-		address_in.sin_port = htons(port);
-
-		address = reinterpret_cast<sockaddr*>(&address_in);
-		address_size = reinterpret_cast<socklen_t*>(&address_in_size);
-
-		// Forcefully attaching socket to the port
-		auto error_code = bind(server_fd, address, sizeof(address_in));
-		if(error_code < 0) {
-			perror("bind failed");
-			return -1;
-		}
-		error_code = listen(server_fd, 3);
-		if(error_code < 0) {
-			perror("listen");
-			return -1;
-		}
-	}
 
 	auto cache = create_cache(max_mem, NULL);//we could have written this to the stack to avoid compulsory cpu misses
 	bool is_unset = true;
@@ -168,7 +193,19 @@ int main(int argc, char** argv) {
 	//-----------------------
 
 	while(true) {
-		uint new_socket = accept(server_fd, address, address_size);
+		Socket open_socket;
+		printf("starting poll\n");
+		auto n = poll(file_descs, file_desc_size, -1);
+		if(tcp_fd->revents == POLLIN) {
+			open_socket = tcp_socket;
+			printf("response on tcp\n");
+		} else if(udp_fd->revents == POLLIN) {
+			open_socket = udp_socket;
+			printf("response on udp\n");
+		} else continue;
+
+
+		uint new_socket = accept(open_socket.file_desc, open_socket.address, open_socket.address_size);
 		if(new_socket < 0) {
 			perror("accept");
 			return -1;
@@ -179,6 +216,7 @@ int main(int argc, char** argv) {
 		const char* response = NULL;
 		uint response_size = 0;
 
+		// printf("message: %s\n", message);
 		bool is_bad_request = true;
 		if(match_start(message, message_size, "GET ", 4)) {
 			message = &message[4];
@@ -285,10 +323,10 @@ int main(int argc, char** argv) {
 				// tm tm;
 				// gmtime_r(time(0), &tm);
 				// buffer_size += strftime(buffer, MAX_MESSAGE_SIZE - buffer_size, "Date: %a, %d %b %Y %H:%M:%S %Z ", &tm);
-				//
-				// response = ACCEPTED;
-				// response_size = strlen(ACCEPTED);
-				// is_bad_request = false;
+
+				response = ACCEPTED;
+				response_size = strlen(ACCEPTED);
+				is_bad_request = false;
 			}
 		} else if(match_start(message, message_size, "POST ", 5)) {//may break in here
 			message = &message[5];
@@ -296,7 +334,7 @@ int main(int argc, char** argv) {
 			if(match_start(message, message_size, "/shutdow", 8)) {
 				message = &message[8];
 				message_size -= 8;
-				if(message_size == 1 and message[0] == 'n') {
+				if(message_size >= 1 and message[0] == 'n') {
 					//-----------
 					//BREAKS HERE
 					send(new_socket, ACCEPTED, strlen(ACCEPTED), 0);
@@ -306,7 +344,7 @@ int main(int argc, char** argv) {
 			} else if(match_start(message, message_size, "/memsize", 8)) {
 				message = &message[8];
 				message_size -= 8;
-				if(message_size == 1 + sizeof(uint) and message[0] == '/') {
+				if(message_size >= 1 + sizeof(uint) and message[0] == '/') {
 					message = &message[1];
 					message_size -= 1;
 					uint new_max_mem = *reinterpret_cast<uint*>(message);
@@ -328,14 +366,18 @@ int main(int argc, char** argv) {
 			response = BAD_REQUEST;
 			response_size = strlen(BAD_REQUEST);
 		}
+
+		// printf("replying: %s\n", response);
 		send(new_socket, response, response_size, 0);
+		close(new_socket);
 	}
 
 	//-----------------
 	//PROGRAM EXITS HERE
 	//this is the only exit point for the program
 	//release the socket back to the os
-	close(server_fd);
+	close(tcp_socket.file_desc);
+	close(udp_socket.file_desc);
 	//NOTE: uncomment if program no longer exits here
 	// destroy_cache(cache);
 	return 0;
