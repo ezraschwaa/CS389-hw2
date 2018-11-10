@@ -224,6 +224,9 @@ int main(int argc, char** argv) {
 		} else if(tcp_fd->revents == POLLHUP) {
 			printf("tcp POLLHUP\n");
 			return -1;
+		} else {
+			printf("Error: tcp was: %d, udp was: %d\n", tcp_fd->revents, udp_fd->revents);
+			return -1;
 		}
 
 
@@ -399,7 +402,7 @@ int main(int argc, char** argv) {
 		}
 
 		printf("%.*s\n---\n", response_size, response);
-		
+
 		send(new_socket, response, response_size, 0);
 		close(new_socket);
 	}
