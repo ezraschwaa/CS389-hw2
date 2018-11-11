@@ -305,7 +305,7 @@ int main(int argc, char** argv) {
 						if(code < 0) {
 							response = TOO_LARGE;
 							response_size = strlen(TOO_LARGE);
-						} else if(code > 0) {
+						} else if(code == 0) {
 							is_unset = false;
 							response = CREATED;
 							response_size = strlen(CREATED);
