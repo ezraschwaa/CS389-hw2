@@ -187,18 +187,20 @@ int main(int argc, char** argv) {
 	char* buffer = &full_buffer[strlen(ACCEPTED) + 1];
 	//-----------------------
 
+	uint request_total = 0;
 	while(true) {
+		request_total += 1;
 		Socket open_socket;
 		printf("starting poll\n");
 		auto n = poll(file_descs, file_desc_size, -1);
 		bool is_udp = false;
 		if(tcp_fd->revents == POLLIN) {
 			open_socket = tcp_socket;
-			printf("response on tcp---REQUEST:\n");
+			printf("%d-response on tcp---REQUEST:\n", request_total);
 		} else if(udp_fd->revents == POLLIN) {
 			open_socket = udp_socket;
 			is_udp = true;
-			printf("response on udp---REQUEST:\n");
+			printf("%d-response on udp---REQUEST:\n", request_total);
 		} else if(udp_fd->revents == POLLERR) {
 			printf("udp POLLERR\n");
 			return -1;
