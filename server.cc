@@ -276,14 +276,10 @@ int main(int argc, char** argv) {
 					is_bad_request = false;
 				}
 			} else if(match_start(message, message_size, "/memsize", 8)) {
-				message = &message[8];
-				message_size -= 8;
-				if(message_size == 0) {
-					write_uint_to(buffer, cache_space_used(cache));
-					response = full_buffer;
-					response_size = sizeof(uint) + strlen(ACCEPTED) + 1;
-					is_bad_request = false;
-				}
+				write_uint_to(buffer, cache_space_used(cache));
+				response = full_buffer;
+				response_size = sizeof(uint) + strlen(ACCEPTED) + 1;
+				is_bad_request = false;
 			}
 		}
 		if(!is_udp) {
@@ -359,22 +355,18 @@ int main(int argc, char** argv) {
 			} else if(match_start(message, message_size, "POST ", 5)) {//may break in here
 				message = &message[5];
 				message_size -= 5;
-				if(match_start(message, message_size, "/shutdow", 8)) {
-					message = &message[8];
-					message_size -= 8;
-					if(message_size >= 1 and message[0] == 'n') {
-						//-----------
-						//BREAKS HERE
-						send(new_socket, ACCEPTED, strlen(ACCEPTED), 0);
-						break;
-						//-----------
-					}
-				} else if(match_start(message, message_size, "/memsize", 8)) {
-					message = &message[8];
-					message_size -= 8;
-					if(message_size >= 1 + sizeof(uint) and message[0] == '/') {
-						message = &message[1];
-						message_size -= 1;
+				if(match_start(message, message_size, "/shutdown", 9)) {
+					message = &message[9];
+					message_size -= 9;
+					//-----------
+					//BREAKS HERE
+					send(new_socket, ACCEPTED, strlen(ACCEPTED), 0);
+					break;
+					//-----------
+				} else if(match_start(message, message_size, "/memsize/", 9)) {
+					message = &message[9];
+					message_size -= 9;
+					if(message_size >= sizeof(uint)) {
 						uint new_max_mem = *reinterpret_cast<uint*>(message);
 						if(is_unset and new_max_mem > 0 and new_max_mem <= MAX_MAX_MEMORY) {
 							//Resetting the max_mem would be so so easy if it wasn't for the fixed api, now we have to delete the current cache just to reset it. What could have been the least expensive call for the entire server will now most likely be very expensive.
