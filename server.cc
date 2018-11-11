@@ -35,20 +35,12 @@ const char* REQUEST_TYPE = "Content-Type: text/plain\n";
 const char* RESPONSE_TYPE = "Accept: text/plain\n";
 
 
-constexpr uint64 str_to_uint(const char* const w, const uint size) {
-	uint64 ret = 0;
-	for(byte i = 0; i < size; i += 1) {
-		auto c = w[i];
-		ret = (ret<<8)|c;
-	}
-	return ret;
-}
-
-constexpr inline bool match_start(const char* const item, const uint item_size, const char* const w, const uint size) {
-	auto ret = str_to_uint(w, size);
+constexpr bool match_start(const char* const item, const uint item_size, const char* const w, const uint size) {
 	if(item_size < size) return false;
-	const uint64 word = *reinterpret_cast<const uint64*>(item);
-	return word>>(8*(8 - size)) == ret;
+	for(uint i = 0; i < size; i += 1) {
+		if(item[i] != w[i]) return false;
+	}
+	return true;
 }
 constexpr uint get_item_size(const char* const w, const uint total_size) {
 	uint i = 0;
@@ -69,20 +61,18 @@ struct Socket {
 	sockaddr* address;
 	socklen_t* address_size;
 };
-// enum Protocol {
-// 	UPD = SOCK_STREAM,
-// 	TCP = SOCK_DGRAM,
-// };
 int create_socket(Socket* open_socket, uint p, uint port) {
 	// Creating socket file descriptor
 	uint64 server_fd = socket(AF_INET, p, 0);
 	if(server_fd == 0) {
+		printf("listen error\n");
 		return -1;
 	}
 
 	uint opt = 1;
 	bool failure = setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
 	if(failure) {
+		printf("listen error\n");
 		return -1;
 	}
 
@@ -98,11 +88,15 @@ int create_socket(Socket* open_socket, uint p, uint port) {
 	// Forcefully attaching socket to the port
 	auto error_code = bind(server_fd, address, sizeof(address_in));
 	if(error_code < 0) {
+		printf("listen error\n");
 		return -1;
 	}
-	error_code = listen(server_fd, 3);
-	if(error_code < 0) {
-		return -1;
+	if(p != SOCK_DGRAM) {
+		error_code = listen(server_fd, 3);
+		if(error_code < 0) {
+			printf("listen error\n");
+			return -1;
+		}
 	}
 	open_socket->file_desc = server_fd;
 	open_socket->address = address;
@@ -166,20 +160,19 @@ int main(int argc, char** argv) {
 
 	Socket tcp_socket;
 	Socket udp_socket;
-	create_socket(&tcp_socket, SOCK_STREAM, port);
 	create_socket(&udp_socket, SOCK_DGRAM, port);
-	pollfd tcp_fd_;
-	tcp_fd_.fd = tcp_socket.file_desc;
-	tcp_fd_.events = POLLIN;
-	tcp_fd_.revents = 0;
-	pollfd udp_fd_;
-	udp_fd_.fd = udp_socket.file_desc;
-	udp_fd_.events = POLLIN;
-	udp_fd_.revents = 0;
+	create_socket(&tcp_socket, SOCK_STREAM, port);
 	uint file_desc_size = 2;
-	pollfd file_descs[2] = {tcp_fd_, udp_fd_};
-	pollfd* tcp_fd = &file_descs[0];
-	pollfd* udp_fd = &file_descs[1];
+	pollfd file_descs[2];
+	memset(file_descs, 0, 2*sizeof(pollfd));
+	pollfd* tcp_fd = &file_descs[1];
+	tcp_fd->fd = tcp_socket.file_desc;
+	tcp_fd->events = POLLIN;
+	tcp_fd->revents = 0;
+	pollfd* udp_fd = &file_descs[0];
+	udp_fd->fd = udp_socket.file_desc;
+	udp_fd->events = POLLIN;
+	udp_fd->revents = 0;
 
 
 	auto cache = create_cache(max_mem, NULL);//we could have written this to the stack to avoid compulsory cpu misses
@@ -213,8 +206,11 @@ int main(int argc, char** argv) {
 			printf("tcp POLLERR\n");
 			return -1;
 		} else if(udp_fd->revents == POLLNVAL) {
-			printf("udp POLLNVAL\n");
-			return -1;
+			create_socket(&udp_socket, SOCK_DGRAM, port);
+			udp_fd->fd = udp_socket.file_desc;
+			udp_fd->events = POLLIN;
+			udp_fd->revents = 0;
+			continue;
 		} else if(tcp_fd->revents == POLLNVAL) {
 			printf("tcp POLLNVAL\n");
 			return -1;
