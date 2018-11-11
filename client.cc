@@ -60,29 +60,30 @@ int charsBeforeNewline(char* cStr) {
     return stringLength;
 }
 
-char* getStatusCode(socketType clientSocket) {
-    char serverReadBuffer[2048];
-    int serverReadLength = read(clientSocket, serverReadBuffer, 2048);
-    assert(serverReadLength >= 0 && "Status code not received from server.");
+char* getStatusCode(char* sourceBuffer, int sourceBufferLength) {
 
     int statusCodeStart = 0;
-    while (statusCodeStart < serverReadLength) {
-        if (serverReadBuffer[statusCodeStart] == ' '){
+    while (statusCodeStart < sourceBufferLength) {
+        if (sourceBuffer[statusCodeStart] == ' '){
             statusCodeStart++;
             break;
         }
         statusCodeStart++;
     }
-    int statusCodeEnd = charsBeforeNewline(serverReadBuffer);
+    int statusCodeEnd = charsBeforeNewline(sourceBuffer);
     assert(statusCodeStart < statusCodeEnd && "Status code does not start where expected.");
 
     char* statusCodeStr = new char[statusCodeEnd - statusCodeStart];
     for (int i = 0; i < (statusCodeEnd - statusCodeStart); i++) {
-        statusCodeStr[i] = serverReadBuffer[i + statusCodeStart];
+        statusCodeStr[i] = sourceBuffer[i + statusCodeStart];
     }
-    std::cout << statusCodeStr << "\n";
     return statusCodeStr;
 }
+
+// int handleStatusCode(char* sourceBuffer, int sourceBufferLength) {
+//     char* statusCode;
+
+// }
 
 socketType start_socket(int commType, uint16_t portNum, const char* ipAddress) {
     socketType newSocket = socket(AF_INET, commType, 0);
@@ -121,11 +122,16 @@ int cache_set(cache_type cache, key_type key, val_type val, index_type val_size)
     std::cout << setRequest;
     send(cache->tcpSocket, setRequest, strlen(setRequest), 0);
 
-    int setSuccess = 0;
+    char* serverReadBuffer = new char[2048];
+    int serverReadLength = read(cache->tcpSocket, serverReadBuffer, 2048);
+    assert(serverReadLength >= 0 && "Failed to read from server.");
     char* statusCode;
+
+    int setSuccess = 0;
     bool codeNeeded = true;
     while (codeNeeded) { // Loop waiting for status code
-        statusCode = getStatusCode(cache->tcpSocket);
+        statusCode = getStatusCode(serverReadBuffer, 2048);
+        std::cout << statusCode << "\n";
         switch(statusCode[0]) {
             case '1':
                 delete[] statusCode;
@@ -145,6 +151,7 @@ int cache_set(cache_type cache, key_type key, val_type val, index_type val_size)
     }
 
     delete[] setRequest;
+    delete[] serverReadBuffer;
     delete[] statusCode;
     return setSuccess; //Placeholder
 }
@@ -154,30 +161,35 @@ val_type cache_get(cache_type cache, key_type key, index_type *val_size) {
     std::cout << getRequest;
     send(cache->tcpSocket, getRequest, strlen(getRequest), 0);
 
-//     int deleteSuccess = 0;
-//     char* statusCode;
-//     bool codeNeeded = true;
-//     while (codeNeeded) { // Loop waiting for status code
-//         statusCode = getStatusCode(cache->tcpSocket);
-//         switch(statusCode[0]) {
-//             case '1':
-//                 delete[] statusCode;
-//                 continue;
-//             case '2':
-//                 codeNeeded = false;
-//             case '3':
-//                 delete[] statusCode;
-//                 continue;
-//             case '4':
-//                 deleteSuccess = -1;
-//                 codeNeeded = false;
-//             case '5':
-//                 deleteSuccess = -1;
-//                 codeNeeded = false;
-//         }
-//     }
+    char* serverReadBuffer = new char[2048];
+    int serverReadLength = read(cache->tcpSocket, serverReadBuffer, 2048);
+    assert(serverReadLength >= 0 && "Failed to read from server.");
+    char* statusCode = getStatusCode(serverReadBuffer, 2048);
+
+    int setSuccess = 0;
+    bool codeNeeded = true;
+    while (codeNeeded) { // Loop waiting for status code
+        statusCode = getStatusCode(serverReadBuffer, 2048);
+        switch(statusCode[0]) {
+            case '1':
+                delete[] statusCode;
+                continue;
+            case '2':
+                codeNeeded = false;
+            case '3':
+                delete[] statusCode;
+                continue;
+            case '4':
+                setSuccess = -1;
+                codeNeeded = false;
+            case '5':
+                setSuccess = -1;
+                codeNeeded = false;
+        }
+    }
 
     delete[] getRequest;
+    delete[] statusCode;
     return NULL; //Placeholder
 }
 
@@ -186,11 +198,15 @@ int cache_delete(cache_type cache, key_type key) {
     std::cout << deleteRequest;
     send(cache->tcpSocket, deleteRequest, strlen(deleteRequest), 0);
 
+    char* serverReadBuffer = new char[2048];
+    int serverReadLength = read(cache->tcpSocket, serverReadBuffer, 2048);
+    assert(serverReadLength >= 0 && "Failed to read from server.");
+    char* statusCode = getStatusCode(serverReadBuffer, 2048);
+
     int deleteSuccess = 0;
-    char* statusCode;
     bool codeNeeded = true;
     while (codeNeeded) { // Loop waiting for status code
-        statusCode = getStatusCode(cache->tcpSocket);
+        statusCode = getStatusCode(serverReadBuffer, 2048);
         switch(statusCode[0]) {
             case '1':
                 delete[] statusCode;
@@ -211,7 +227,7 @@ int cache_delete(cache_type cache, key_type key) {
 
     delete[] deleteRequest;
     delete[] statusCode;
-    return 0; //Placeholder
+    return deleteSuccess; //Placeholder
 }
 
 index_type cache_space_used(cache_type cache){
@@ -230,21 +246,47 @@ void destroy_cache(cache_type cache) {
     std::cout << destroyRequest;
     send(cache->tcpSocket, destroyRequest, strlen(destroyRequest), 0);
 
-    // Receive error code from server
+    char* serverReadBuffer = new char[2048];
+    int serverReadLength = read(cache->tcpSocket, serverReadBuffer, 2048);
+    assert(serverReadLength >= 0 && "Failed to read from server.");
+    char* statusCode = getStatusCode(serverReadBuffer, 2048);
+
+    int setSuccess = 0;
+    bool codeNeeded = true;
+    while (codeNeeded) { // Loop waiting for status code
+        statusCode = getStatusCode(serverReadBuffer, 2048);
+        switch(statusCode[0]) {
+            case '1':
+                delete[] statusCode;
+                continue;
+            case '2':
+                codeNeeded = false;
+            case '3':
+                delete[] statusCode;
+                continue;
+            case '4':
+                setSuccess = -1;
+                codeNeeded = false;
+            case '5':
+                setSuccess = -1;
+                codeNeeded = false;
+        }
+    }
 
     delete[] destroyRequest;
+    delete[] statusCode;
 }
 
 int main() {
     cache_type testCache = create_cache(4096, NULL);
     key_type shortCstring = "bbq";
-    // char* valueText = "BarbecueLettuce";
-    // void* placeholderValue = static_cast<void*>(valueText);
+    char* valueText = "BarbecueLettuce";
+    void* placeholderValue = reinterpret_cast<void*>(valueText);
     index_type placeholderValSize = 15;
-    // cache_set(testCache, shortCstring, placeholderValue, placeholderValSize);
-    cache_get(testCache, shortCstring, &placeholderValSize);
-    cache_delete(testCache, shortCstring);
-    cache_space_used(testCache);
-    destroy_cache(testCache);
+    cache_set(testCache, shortCstring, placeholderValue, placeholderValSize);
+    // cache_get(testCache, shortCstring, &placeholderValSize);
+    // cache_delete(testCache, shortCstring);
+    // cache_space_used(testCache);
+    // destroy_cache(testCache);
     return 1; // Main is for testing only, will vanish from final program
 }
