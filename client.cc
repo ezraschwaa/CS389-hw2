@@ -163,7 +163,6 @@ int cache_set(cache_type cache, key_type key, val_type val, index_type val_size)
     char* serverReadBuffer = new char[2048];
     int serverReadLength = read(setSocket, serverReadBuffer, 2048);
     assert(serverReadLength >= 0 && "Failed to read from server.");
-    char* statusCode;
 
     int setSuccess = handleStatusCode(serverReadBuffer, 2048);
 
@@ -183,14 +182,13 @@ val_type cache_get(cache_type cache, key_type key, index_type *val_size) {
     char* serverReadBuffer = new char[2048];
     int serverReadLength = read(getSocket, serverReadBuffer, 2048);
     assert(serverReadLength >= 0 && "Failed to read from server.");
-    char* statusCode = getStatusCode(serverReadBuffer, 2048);
 
     int getSuccess = handleStatusCode(serverReadBuffer, 2048);
 
     //If applicable, read and return reply
 
     delete[] getRequest;
-    delete[] statusCode;
+    delete[] serverReadBuffer;
     return NULL; //Placeholder
 }
 
@@ -205,12 +203,11 @@ int cache_delete(cache_type cache, key_type key) {
     char* serverReadBuffer = new char[2048];
     int serverReadLength = read(deleteSocket, serverReadBuffer, 2048);
     assert(serverReadLength >= 0 && "Failed to read from server.");
-    char* statusCode = getStatusCode(serverReadBuffer, 2048);
 
     int deleteSuccess = handleStatusCode(serverReadBuffer, 2048);
 
     delete[] deleteRequest;
-    delete[] statusCode;
+    delete[] serverReadBuffer;
     return deleteSuccess;
 }
 
@@ -220,7 +217,6 @@ index_type cache_space_used(cache_type cache){
     char* spaceUsedRequest = makeHttpRequest("GET", "memsize", NULL, NULL);
     std::cout << spaceUsedRequest;
     int sendSuccess = send(spaceUsedSocket, spaceUsedRequest, strlen(spaceUsedRequest), 0);
-    std::cout << sendSuccess << "\n";
     assert(sendSuccess >= 0 && "Failed to send space used request.");
 
     // Receive reply from server
@@ -247,7 +243,7 @@ int main() {
     void* placeholderValue = reinterpret_cast<void*>(valueText);
     index_type placeholderValSize = 15;
     cache_set(testCache, shortCstring, placeholderValue, placeholderValSize);
-    cache_get(testCache, shortCstring, &placeholderValSize); //Weird segfault here; debug when possible
+    cache_get(testCache, shortCstring, &placeholderValSize);
     cache_space_used(testCache);
     cache_delete(testCache, shortCstring);
     destroy_cache(testCache);
