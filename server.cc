@@ -362,6 +362,7 @@ int main(int argc, char** argv) {
 					message_size -= 9;
 					//-----------
 					//BREAKS HERE
+					printf("%s\n---\n", ACCEPTED);
 					send(new_socket, ACCEPTED, strlen(ACCEPTED), 0);
 					break;
 					//-----------
