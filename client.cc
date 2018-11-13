@@ -239,8 +239,8 @@ void destroy_cache(cache_type cache) {
 int main() {
     cache_type testCache = create_cache(4096, NULL);
     key_type shortCstring = "bbq";
-    char* valueText = "BarbecueLettuce";
-    void* placeholderValue = reinterpret_cast<void*>(valueText);
+    const char* valueText = "BarbecueLettuce";
+    const void* placeholderValue = static_cast<const void*>(valueText);
     index_type placeholderValSize = 15;
     cache_set(testCache, shortCstring, placeholderValue, placeholderValSize);
     cache_get(testCache, shortCstring, &placeholderValSize);
