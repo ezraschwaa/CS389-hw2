@@ -176,6 +176,7 @@ int main(int argc, char** argv) {
 
 
 	auto cache = create_cache(max_mem, NULL);//we could have written this to the stack to avoid compulsory cpu misses
+	printf("%d\n", max_mem);
 	bool is_unset = true;
 
 	//-----------------------
@@ -183,8 +184,7 @@ int main(int argc, char** argv) {
 	char message_buffer[MAX_MESSAGE_SIZE + 1];
 	char full_buffer[MAX_MESSAGE_SIZE + strlen(ACCEPTED) + 2*sizeof(uint)];
 	memcpy(full_buffer, ACCEPTED, strlen(ACCEPTED));
-	full_buffer[strlen(ACCEPTED)] = ' ';
-	char* buffer = &full_buffer[strlen(ACCEPTED) + 1];
+	char* buffer = &full_buffer[strlen(ACCEPTED)];
 	//-----------------------
 
 	uint request_total = 0;
@@ -250,10 +250,16 @@ int main(int argc, char** argv) {
 				message_size -= 5;
 				auto key = message;
 				uint key_size = get_item_size(key, message_size);
+				// printf("%.*s\n", key_size, key);
 				if(key_size > 0) {
 					key[key_size] = 0;//--<--
 					uint value_size;
-					auto value = cache_get(cache, &buffer[sizeof(uint)], &value_size);
+					auto value = cache_get(cache, key, &value_size);
+					// if(value == NULL) {
+					// 	printf("not found");
+					// } else {
+					// 	printf("%.*s\n", value_size, static_cast<const char*>(value));
+					// }
 					if(value == NULL) {
 						response = NOT_FOUND;
 						response_size = strlen(NOT_FOUND);
@@ -280,8 +286,9 @@ int main(int argc, char** argv) {
 			} else if(match_start(message, message_size, "/memsize", 8)) {
 				write_uint_to(buffer, cache_space_used(cache));
 				response = full_buffer;
-				response_size = sizeof(uint) + strlen(ACCEPTED) + 1;
+				response_size = sizeof(uint) + strlen(ACCEPTED);
 				is_bad_request = false;
+				printf("%d\n", *reinterpret_cast<uint*>(buffer));
 			}
 		}
 		if(!is_udp) {
@@ -351,7 +358,7 @@ int main(int argc, char** argv) {
 					memcpy(&buffer[buffer_size], REQUEST_TYPE, strlen(REQUEST_TYPE));
 
 					response = full_buffer;
-					response_size = buffer_size + strlen(ACCEPTED) + 1;
+					response_size = buffer_size + strlen(ACCEPTED);
 					is_bad_request = false;
 				}
 			} else if(match_start(message, message_size, "POST ", 5)) {//may break in here
@@ -392,7 +399,7 @@ int main(int argc, char** argv) {
 			response_size = strlen(BAD_REQUEST);
 		}
 
-		printf("%.*s\n---\n", response_size, response);
+		printf("%d-%.*s\n---\n", response_size - static_cast<uint>(strlen(ACCEPTED)), response_size, response);
 
 		send(new_socket, response, response_size, 0);
 		close(new_socket);
