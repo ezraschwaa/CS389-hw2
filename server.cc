@@ -31,6 +31,7 @@ const char* BAD_REQUEST = "HTTP/1.1 400\n\n";
 const char* TOO_LARGE   = "HTTP/1.1 413\n\n";
 const char* NOT_ALLOWED = "HTTP/1.1 405\n\n";
 const char* NOT_FOUND   = "HTTP/1.1 404\n\n";
+const uint HEADER_SIZE = strlen(ACCEPTED);
 const char* REQUEST_TYPE = "Content-Type: text/plain\n";
 const char* RESPONSE_TYPE = "Accept: text/plain\n";
 
@@ -113,7 +114,7 @@ int main(int argc, char** argv) {
 		opterr = 0;
 		auto c = getopt(argc, argv, "mt:");
 		while(c != -1) {
-			printf("%d\n", c);
+			// printf("%d\n", c);
 			switch (c) {
 			case 'm':
 				max_mem_arg = optarg;
@@ -142,7 +143,7 @@ int main(int argc, char** argv) {
 			auto user_max_mem = strtoul(max_mem_arg, NULL, 0);
 			if(user_max_mem > 0 and user_max_mem <= MAX_MAX_MEMORY) {
 				max_mem = user_max_mem;
-				printf("1 %d\n", max_mem);
+				// printf("1 %d\n", max_mem);
 			} else {
 				fprintf(stderr, "Option -m requires a valid memory size.\n");
 			}
@@ -151,7 +152,7 @@ int main(int argc, char** argv) {
 			auto user_port = strtoul(port_arg, NULL, 0);
 			if(user_port > 0 and user_port < 65535) {
 				port = user_port;
-				printf("2 %d\n", port);
+				// printf("2 %d\n", port);
 			} else {
 				fprintf(stderr, "Option -t requires a valid port no.\n");
 			}
@@ -176,15 +177,15 @@ int main(int argc, char** argv) {
 
 
 	auto cache = create_cache(max_mem, NULL);//we could have written this to the stack to avoid compulsory cpu misses
-	printf("%d\n", max_mem);
+	// printf("%d\n", max_mem);
 	bool is_unset = true;
 
 	//-----------------------
 	//NOTE: BUFFER OVERFLOW DANGER, all writes to either buffer must be provably safe(can't overflow buffer)
 	char message_buffer[MAX_MESSAGE_SIZE + 1];
-	char full_buffer[MAX_MESSAGE_SIZE + strlen(ACCEPTED) + 2*sizeof(uint)];
-	memcpy(full_buffer, ACCEPTED, strlen(ACCEPTED));
-	char* buffer = &full_buffer[strlen(ACCEPTED)];
+	char full_buffer[MAX_MESSAGE_SIZE + HEADER_SIZE + 2*sizeof(uint)];
+	memcpy(full_buffer, ACCEPTED, HEADER_SIZE);
+	char* buffer = &full_buffer[HEADER_SIZE];
 	//-----------------------
 
 	uint request_total = 0;
@@ -262,10 +263,10 @@ int main(int argc, char** argv) {
 					// }
 					if(value == NULL) {
 						response = NOT_FOUND;
-						response_size = strlen(NOT_FOUND);
+						response_size = HEADER_SIZE;
 					} else if(key_size + value_size >= MAX_MESSAGE_SIZE) {//shouldn't be possible
 						response = TOO_LARGE;
-						response_size = strlen(TOO_LARGE);
+						response_size = HEADER_SIZE;
 					} else {
 						uint buffer_size = 0;
 						write_uint_to(&buffer[buffer_size], key_size);
@@ -279,16 +280,16 @@ int main(int argc, char** argv) {
 						buffer_size += value_size;
 
 						response = full_buffer;
-						response_size = buffer_size + strlen(ACCEPTED) + 1;
+						response_size = buffer_size + HEADER_SIZE;
 					}
 					is_bad_request = false;
 				}
 			} else if(match_start(message, message_size, "/memsize", 8)) {
 				write_uint_to(buffer, cache_space_used(cache));
 				response = full_buffer;
-				response_size = sizeof(uint) + strlen(ACCEPTED);
+				response_size = sizeof(uint) + HEADER_SIZE;
 				is_bad_request = false;
-				printf("%d\n", *reinterpret_cast<uint*>(buffer));
+				// printf("%d\n", *reinterpret_cast<uint*>(buffer));
 			}
 		}
 		if(!is_udp) {
@@ -309,14 +310,14 @@ int main(int argc, char** argv) {
 						auto code = cache_set(cache, key, value, value_size);
 						if(code < 0) {
 							response = TOO_LARGE;
-							response_size = strlen(TOO_LARGE);
+							response_size = HEADER_SIZE;
 						} else if(code == 0) {
 							is_unset = false;
 							response = CREATED;
-							response_size = strlen(CREATED);
+							response_size = HEADER_SIZE;
 						} else {
 							response = ACCEPTED;
-							response_size = strlen(ACCEPTED);
+							response_size = HEADER_SIZE;
 						}
 						is_bad_request = false;
 					}
@@ -336,10 +337,10 @@ int main(int argc, char** argv) {
 						auto code = cache_delete(cache, key);
 						if(code < 0) {
 							response = NOT_FOUND;
-							response_size = strlen(NOT_FOUND);
+							response_size = HEADER_SIZE;
 						} else {
 							response = ACCEPTED;
-							response_size = strlen(ACCEPTED);
+							response_size = HEADER_SIZE;
 						}
 						is_bad_request = false;
 					}
@@ -358,7 +359,7 @@ int main(int argc, char** argv) {
 					memcpy(&buffer[buffer_size], REQUEST_TYPE, strlen(REQUEST_TYPE));
 
 					response = full_buffer;
-					response_size = buffer_size + strlen(ACCEPTED);
+					response_size = buffer_size + HEADER_SIZE;
 					is_bad_request = false;
 				}
 			} else if(match_start(message, message_size, "POST ", 5)) {//may break in here
@@ -370,7 +371,7 @@ int main(int argc, char** argv) {
 					//-----------
 					//BREAKS HERE
 					printf("%s\n---\n", ACCEPTED);
-					send(new_socket, ACCEPTED, strlen(ACCEPTED), 0);
+					send(new_socket, ACCEPTED, HEADER_SIZE, 0);
 					break;
 					//-----------
 				} else if(match_start(message, message_size, "/memsize/", 9)) {
@@ -383,10 +384,10 @@ int main(int argc, char** argv) {
 							destroy_cache(cache);
 							cache = create_cache(new_max_mem, NULL);
 							response = ACCEPTED;
-							response_size = strlen(ACCEPTED);
+							response_size = HEADER_SIZE;
 						} else {
 							response = NOT_ALLOWED;
-							response_size = strlen(NOT_ALLOWED);
+							response_size = HEADER_SIZE;
 						}
 						is_bad_request = false;
 					}
@@ -396,10 +397,10 @@ int main(int argc, char** argv) {
 
 		if(is_bad_request) {
 			response = BAD_REQUEST;
-			response_size = strlen(BAD_REQUEST);
+			response_size = HEADER_SIZE;
 		}
 
-		printf("%d-%.*s\n---\n", response_size - static_cast<uint>(strlen(ACCEPTED)), response_size, response);
+		printf("%d-%.*s\n---\n", response_size - HEADER_SIZE, response_size, response);
 
 		send(new_socket, response, response_size, 0);
 		close(new_socket);
