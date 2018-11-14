@@ -18,17 +18,18 @@ struct cache_obj {
 };
 
 uint16_t PORTNUM = 33052;
-const char* LOCALHOST = "127.0.0.1";
+const char* IPADDRESS = "127.0.0.1";
 
-char* makeHttpRequest(const char* method, const char* uriBase, const char* key, const char* value) {
+char* makeHttpRequest(const char* method, const char* uriBase, const char* key, val_type value, uint32_t valLength) {
     uint32_t beforeKeyLength = strlen(method) + strlen(uriBase) + 2; //Add 2 for the " /" between the method and the URI
     uint32_t keyLength = 0;
-    uint32_t valLength = 0;
+    const char* valAsStr;
     if (key != NULL) {
         keyLength = strlen(key) + 1; //Add 1 for the / before the key
     }
     if (value != NULL) {
-        valLength = strlen(value) + 1; //Add 1 for the / before the value
+        valAsStr = static_cast<const char*>(value);
+        valLength += 1; //Add 1 for the / before the value
     }
     uint32_t overallLength = beforeKeyLength + keyLength + valLength + 3; //Add 3 for two newlines and one null terminator
 
@@ -41,26 +42,25 @@ char* makeHttpRequest(const char* method, const char* uriBase, const char* key, 
     } else if ((key != NULL) && (value == NULL)) {
         requestFillSuccess = sprintf(request, "%s /%s/%s%s", method, uriBase, key, finalNewlines);
     } else if ((key == NULL) && (value != NULL)) {
-        requestFillSuccess = sprintf(request, "%s /%s/%s%s", method, uriBase, value, finalNewlines);
+        requestFillSuccess = sprintf(request, "%s /%s/%.*s%s", method, uriBase, valLength, valAsStr, finalNewlines);
     } else { //(key != NULL) && (value != NULL)
-        requestFillSuccess = sprintf(request, "%s /%s/%s/%s%s", method, uriBase, key, value, finalNewlines);
+        requestFillSuccess = sprintf(request, "%s /%s/%s/%.*s%s", method, uriBase, key, valLength, valAsStr, finalNewlines);
     }
     assert(requestFillSuccess > 0 && "Failed to stitch together HTTP request string.");
 
     return request;
 }
 
-int charsBeforeNewline(char* cStr) {
-    int stringLength = strlen(cStr);
-    for (int i = 0; i < stringLength; i++) {
+int charsBeforeNewline(char* cStr, int cStrLength) {
+    for (int i = 0; i < cStrLength; i++) {
         if (cStr[i] == '\n') {
             return i; 
         }
     }
-    return stringLength;
+    return cStrLength;
 }
 
-char* getStatusCode(char* sourceBuffer, int sourceBufferLength) {
+uint32_t getStatusCodeIndex(char* sourceBuffer, int sourceBufferLength) {
 
     int statusCodeStart = 0;
     while (statusCodeStart < sourceBufferLength) {
@@ -70,56 +70,55 @@ char* getStatusCode(char* sourceBuffer, int sourceBufferLength) {
         }
         statusCodeStart++;
     }
-    int statusCodeEnd = charsBeforeNewline(sourceBuffer);
-    assert(statusCodeStart < statusCodeEnd && "Status code does not start where expected.");
-
-    char* statusCodeStr = new char[statusCodeEnd - statusCodeStart];
-    for (int i = 0; i < (statusCodeEnd - statusCodeStart); i++) {
-        statusCodeStr[i] = sourceBuffer[i + statusCodeStart];
-    }
-    return statusCodeStr;
+    return statusCodeStart;
 }
 
 int handleStatusCode(char* sourceBuffer, int sourceBufferLength) {
     char* statusCode;
 
-    int success = 0;
-    bool codeNeeded = true;
-    while (codeNeeded) { // Loop waiting for status code
-        statusCode = getStatusCode(sourceBuffer, sourceBufferLength);
-        switch(statusCode[0]) {
-            case '1':
-                delete[] statusCode;
-                continue;
-            case '2':
-                codeNeeded = false;
-            case '3':
-                delete[] statusCode;
-                continue;
-            case '4':
-                success = -1;
-                codeNeeded = false;
-            case '5':
-                success = -1;
-                codeNeeded = false;
-        }
+    int success = -1;
+    uint32_t statusCodeIndex = getStatusCodeIndex(sourceBuffer, sourceBufferLength);
+    if (sourceBuffer[statusCodeIndex] == '2') {
+        success = 0;
     }
 
-    delete[] statusCode;
     return success;
 }
 
-// char* readMessage(char* sourceBuffer, int sourceBufferLength) {
-//     int messageStart = 0;
-//     bool hitOneNewline = false;
-//     while (messageStart < sourceBufferLength) {
-//         if (sourceBuffer[messageStart] == '\n' &&){
-//             statusCodeStart++;
-//             break;
-//         }
-//         statusCodeStart++;
-//     }
-// }
+char* readMessage(char* sourceBuffer, int sourceBufferLength) {
+    int messageStart = 0;
+    bool hitOneNewline = false;
+    while (messageStart < sourceBufferLength) { // Find index of message body start
+        if (sourceBuffer[messageStart] == '\n'){
+            if (hitOneNewline) {
+                messageStart++;
+                break;
+            } else {
+                hitOneNewline = true;
+            }
+        }
+        messageStart++;
+    }
+
+    char* messageStr = new char[sourceBufferLength - messageStart];
+    for (int i = 0; i < (sourceBufferLength - messageStart); i++) {
+        messageStr[i] = sourceBuffer[i + messageStart];
+    }
+    return messageStr;
+}
+
+char* parseMessageForGet(char* message) {
+    uint32_t keySize = *reinterpret_cast<uint*>(message);
+    uint32_t valIndex = keySize + 4; // +4 for the initial 4 bytes representing key size
+    uint32_t valSize = *reinterpret_cast<uint*>(&message[valIndex]);
+    valIndex += 4; //+4 for reading val size
+
+    char* parsedMessage = new char[valSize];
+    for (int i = 0; i < valSize; i++) {
+        parsedMessage[i] = message[i + valIndex];
+    }
+    return parsedMessage;
+}
 
 socketType start_socket(int commType, uint16_t portNum, const char* ipAddress) {
     socketType newSocket = socket(AF_INET, commType, 0);
@@ -139,16 +138,11 @@ socketType start_socket(int commType, uint16_t portNum, const char* ipAddress) {
 }
 
 cache_type create_cache(index_type maxmem, hash_func hasher) {
-    // socketType tcpSocket = start_socket(SOCK_STREAM, PORTNUM, LOCALHOST);
-    // socketType udpSocket = start_socket(SOCK_DGRAM, PORTNUM, LOCALHOST);
-
     // Ignore maxmem and hasher; the server API doesn't allow them to work any more
 
     cache_obj* cacheStruct = new cache_obj;
-    // cacheStruct->tcpSocket = tcpSocket;
-    // cacheStruct->udpSocket = udpSocket;
     cacheStruct->portNum = PORTNUM;
-    cacheStruct->ipAddress = LOCALHOST;
+    cacheStruct->ipAddress = IPADDRESS;
 
     return cacheStruct;
 }
@@ -156,7 +150,7 @@ cache_type create_cache(index_type maxmem, hash_func hasher) {
 int cache_set(cache_type cache, key_type key, val_type val, index_type val_size) {
     socketType setSocket = start_socket(SOCK_STREAM, cache->portNum, cache->ipAddress);
 
-    char *setRequest = makeHttpRequest("PUT", "key", key, static_cast<const char *>(val));
+    char *setRequest = makeHttpRequest("PUT", "key", key, val, val_size);
     std::cout << setRequest;
     send(setSocket, setRequest, strlen(setRequest), 0);
 
@@ -164,7 +158,7 @@ int cache_set(cache_type cache, key_type key, val_type val, index_type val_size)
     int serverReadLength = read(setSocket, serverReadBuffer, 2048);
     assert(serverReadLength >= 0 && "Failed to read from server.");
 
-    int setSuccess = handleStatusCode(serverReadBuffer, 2048);
+    int setSuccess = handleStatusCode(serverReadBuffer, serverReadLength);
 
     delete[] setRequest;
     delete[] serverReadBuffer;
@@ -174,28 +168,34 @@ int cache_set(cache_type cache, key_type key, val_type val, index_type val_size)
 val_type cache_get(cache_type cache, key_type key, index_type *val_size) {
     socketType getSocket = start_socket(SOCK_STREAM, cache->portNum, cache->ipAddress);
 
-    char *getRequest = makeHttpRequest("GET", "key", key, NULL);
+    char *getRequest = makeHttpRequest("GET", "key", key, NULL, 0);
     std::cout << getRequest;
     int sendSuccess = send(getSocket, getRequest, strlen(getRequest), 0);
     assert(sendSuccess >= 0 && "Failed to send space used request.");
 
-    char* serverReadBuffer = new char[2048];
-    int serverReadLength = read(getSocket, serverReadBuffer, 2048);
+    char* serverReadBuffer = new char[2048 + *val_size];
+    int serverReadLength = read(getSocket, serverReadBuffer, 2048 + *val_size);
     assert(serverReadLength >= 0 && "Failed to read from server.");
 
-    int getSuccess = handleStatusCode(serverReadBuffer, 2048);
+    int getSuccess = handleStatusCode(serverReadBuffer, serverReadLength);
 
-    //If applicable, read and return reply
+    val_type retrievedVal = NULL;
+    if (getSuccess == 0) {
+        char* message = readMessage(serverReadBuffer, serverReadLength);
+        char* parsedMessage = parseMessageForGet(message);
+        retrievedVal = static_cast<val_type>(parsedMessage);
+        delete[] message;
+    }
 
     delete[] getRequest;
     delete[] serverReadBuffer;
-    return NULL; //Placeholder
+    return retrievedVal; //Placeholder
 }
 
 int cache_delete(cache_type cache, key_type key) {
     socketType deleteSocket = start_socket(SOCK_STREAM, cache->portNum, cache->ipAddress);
 
-    char *deleteRequest = makeHttpRequest("DELETE", "key", key, NULL);
+    char *deleteRequest = makeHttpRequest("DELETE", "key", key, NULL, 0);
     std::cout << deleteRequest;
     int sendSuccess = send(deleteSocket, deleteRequest, strlen(deleteRequest), 0);
     assert(sendSuccess >= 0 && "Failed to send delete request.");
@@ -204,7 +204,7 @@ int cache_delete(cache_type cache, key_type key) {
     int serverReadLength = read(deleteSocket, serverReadBuffer, 2048);
     assert(serverReadLength >= 0 && "Failed to read from server.");
 
-    int deleteSuccess = handleStatusCode(serverReadBuffer, 2048);
+    int deleteSuccess = handleStatusCode(serverReadBuffer, serverReadLength);
 
     delete[] deleteRequest;
     delete[] serverReadBuffer;
@@ -214,21 +214,33 @@ int cache_delete(cache_type cache, key_type key) {
 index_type cache_space_used(cache_type cache){
     socketType spaceUsedSocket = start_socket(SOCK_STREAM, cache->portNum, cache->ipAddress);
 
-    char* spaceUsedRequest = makeHttpRequest("GET", "memsize", NULL, NULL);
+    char* spaceUsedRequest = makeHttpRequest("GET", "memsize", NULL, NULL, 0);
     std::cout << spaceUsedRequest;
     int sendSuccess = send(spaceUsedSocket, spaceUsedRequest, strlen(spaceUsedRequest), 0);
     assert(sendSuccess >= 0 && "Failed to send space used request.");
 
-    // Receive reply from server
+    char *serverReadBuffer = new char[2048];
+    int serverReadLength = read(spaceUsedSocket, serverReadBuffer, 2048);
+    assert(serverReadLength >= 0 && "Failed to read from server.");
+
+    int spaceUsedSuccess = handleStatusCode(serverReadBuffer, serverReadLength);
+
+    uint spaceNumber = 0;
+    if (spaceUsedSuccess == 0) {
+        char* spaceNumberStr = readMessage(serverReadBuffer, serverReadLength);
+        spaceNumber = *reinterpret_cast<uint*>(spaceNumberStr);
+        delete[] spaceNumberStr;
+    }
 
     delete[] spaceUsedRequest;
-    return 0; //Placeholder
+    delete[] serverReadBuffer;
+    return spaceNumber;
 }
 
 void destroy_cache(cache_type cache) {
     socketType destroySocket = start_socket(SOCK_STREAM, cache->portNum, cache->ipAddress);
 
-    char* destroyRequest = makeHttpRequest("POST", "shutdown", NULL, NULL);
+    char* destroyRequest = makeHttpRequest("POST", "shutdown", NULL, NULL, 0);
     std::cout << destroyRequest;
     int sendSuccess = send(destroySocket, destroyRequest, strlen(destroyRequest), 0);
     assert(sendSuccess >= 0 && "Failed to send destroy request.");
@@ -241,9 +253,9 @@ int main() {
     key_type shortCstring = "bbq";
     const char* valueText = "BarbecueLettuce";
     const void* placeholderValue = static_cast<const void*>(valueText);
-    index_type placeholderValSize = 15;
+    index_type placeholderValSize = 16;
     cache_set(testCache, shortCstring, placeholderValue, placeholderValSize);
-    cache_get(testCache, shortCstring, &placeholderValSize);
+    val_type getTest = cache_get(testCache, shortCstring, &placeholderValSize);
     cache_space_used(testCache);
     cache_delete(testCache, shortCstring);
     destroy_cache(testCache);
