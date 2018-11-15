@@ -19,5 +19,9 @@ cache_client:
 	$(CPP) -g cache.h -o client client.cc;
 	./client;
 
+cache_test:
+	$(CPP) -g types.h book.h client.cc eviction.cc -o test tests.cc;
+	./test;
+
 clean:
 	rm -f *.o; rm -f *.h.gch; rm test
