@@ -200,11 +200,11 @@ int main(int argc, char** argv) {
 		bool is_udp = false;
 		if(tcp_fd->revents == POLLIN) {
 			open_socket = tcp_socket;
-			printf("response on tcp---REQUEST:\n");
+			printf("response on tcp");
 		} else if(udp_fd->revents == POLLIN) {
 			open_socket = udp_socket;
 			is_udp = true;
-			printf("response on udp---REQUEST:\n");
+			printf("response on udp");
 		} else if(udp_fd->revents == POLLERR) {
 			printf("udp POLLERR\n");
 			return -1;
@@ -243,7 +243,7 @@ int main(int argc, char** argv) {
 		const char* response = NULL;
 		uint response_size = 0;
 
-		printf("%.*s\n---RESPONSE:\n", message_size, message);
+		printf("---REQUEST:\n%.*s\n---\n", message_size, message);
 
 		if(message_size >= MAX_MESSAGE_SIZE) {
 			response = TOO_LARGE;
@@ -258,47 +258,43 @@ int main(int argc, char** argv) {
 					message_size -= 5;
 					auto key = message;
 					uint key_size = get_item_size(key, message_size);
-					// printf("%.*s\n", key_size, key);
 					if(key_size > 0) {
 						key[key_size] = 0;//--<--
 						uint value_size;
 						auto value = cache_get(cache, key, &value_size);
-						// if(value == NULL) {
-							// 	printf("not found");
-							// } else {
-								// 	printf("%.*s\n", value_size, static_cast<const char*>(value));
-								// }
-								if(value == NULL) {
-									response = NOT_FOUND;
-									response_size = HEADER_SIZE;
-								} else if(key_size + value_size >= MAX_MESSAGE_SIZE) {//shouldn't be possible
-								response = TOO_LARGE;
-								response_size = HEADER_SIZE;
-							} else {
-								uint buffer_size = 0;
-								write_uint_to(&buffer[buffer_size], key_size);
-								buffer_size += sizeof(uint);
-								memcpy(&buffer[buffer_size], key, key_size);
-								buffer_size += key_size;
+						if(value == NULL) {
+							response = NOT_FOUND;
+							response_size = HEADER_SIZE;
+						} else if(key_size + value_size >= MAX_MESSAGE_SIZE) {//shouldn't be possible
+						response = TOO_LARGE;
+						response_size = HEADER_SIZE;
+						} else {
+							uint buffer_size = 0;
+							write_uint_to(&buffer[buffer_size], key_size);
+							buffer_size += sizeof(uint);
+							memcpy(&buffer[buffer_size], key, key_size);
+							buffer_size += key_size;
 
-								write_uint_to(&buffer[buffer_size], value_size);
-								buffer_size += sizeof(uint);
-								memcpy(&buffer[buffer_size], value, value_size);
-								buffer_size += value_size;
+							write_uint_to(&buffer[buffer_size], value_size);
+							buffer_size += sizeof(uint);
+							memcpy(&buffer[buffer_size], value, value_size);
+							buffer_size += value_size;
 
-								response = full_buffer;
-								response_size = buffer_size + HEADER_SIZE;
-							}
-							is_bad_request = false;
+							response = full_buffer;
+							response_size = buffer_size + HEADER_SIZE;
+							printf("value found; was: \"%.*s\"\n", value_size, (const char*)value);
 						}
-					} else if(match_start(message, message_size, "/memsize", 8)) {
-						write_uint_to(buffer, cache_space_used(cache));
-						response = full_buffer;
-						response_size = sizeof(uint) + HEADER_SIZE;
 						is_bad_request = false;
-						// printf("%d\n", *reinterpret_cast<uint*>(buffer));
 					}
+				} else if(match_start(message, message_size, "/memsize", 8)) {
+					auto i = cache_space_used(cache);
+					write_uint_to(buffer, i);
+					response = full_buffer;
+					response_size = sizeof(uint) + HEADER_SIZE;
+					is_bad_request = false;
+					printf("memsize requested; is: \"%d\"\n", i);
 				}
+			}
 			if(!is_udp) {
 				if(match_start(message, message_size, "PUT ", 4)) {
 					message = &message[4];
@@ -408,7 +404,7 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		printf("%d-%.*s\n---\n", response_size - HEADER_SIZE, response_size, response);
+		printf("---RESPONSE:\n%d-%.*s\n---\n", response_size - HEADER_SIZE, response_size, response);
 
 		send(new_socket, response, response_size, 0);
 		close(new_socket);
