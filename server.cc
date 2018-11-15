@@ -191,7 +191,7 @@ int main(int argc, char** argv) {
 		request_total += 1;
 		Socket open_socket;
 		// printf("starting poll #%d\n", request_total);
-		auto n = poll(file_descs, file_desc_size, -1);
+		poll(file_descs, file_desc_size, -1);
 		bool is_udp = false;
 		if(tcp_fd->revents == POLLIN) {
 			open_socket = tcp_socket;
@@ -228,8 +228,8 @@ int main(int argc, char** argv) {
 		}
 
 		uint new_socket = accept(open_socket.file_desc, open_socket.address, open_socket.address_size);
-		if(new_socket < 0) {
-			perror("accept");
+		if(new_socket <= 0) {
+			perror("accept failure");
 			return -1;
 		}
 
