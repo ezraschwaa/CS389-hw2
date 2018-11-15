@@ -69,14 +69,14 @@ int create_socket(Socket* open_socket, uint p, uint port) {
 	// Creating socket file descriptor
 	uint64 server_fd = socket(AF_INET, p, 0);
 	if(server_fd == 0) {
-		printf("listen error\n");
+		printf("failed to create socket\n");
 		return -1;
 	}
 
 	uint opt = 1;
 	bool failure = setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
 	if(failure) {
-		printf("listen error\n");
+		printf("failed to set socket options\n");
 		return -1;
 	}
 
@@ -92,19 +92,20 @@ int create_socket(Socket* open_socket, uint p, uint port) {
 	// Forcefully attaching socket to the port
 	auto error_code = bind(server_fd, address, sizeof(address_in));
 	if(error_code < 0) {
-		printf("listen error\n");
+		printf("failed to bind socket\n");
 		return -1;
 	}
 	if(p != SOCK_DGRAM) {
 		error_code = listen(server_fd, 3);
 		if(error_code < 0) {
-			printf("listen error\n");
+			printf("failed to listen\n");
 			return -1;
 		}
 	}
 	open_socket->file_desc = server_fd;
 	open_socket->address = address;
 	open_socket->address_size = address_size;
+	return 0;
 }
 
 
@@ -112,60 +113,54 @@ int main(int argc, char** argv) {
 	uint port = DEFAULT_PORT;
 	uint max_mem = DEFAULT_MAX_MEMORY;
 	{
-		char* port_arg = NULL;
-		char* max_mem_arg = NULL;
+		uint user_port = 0;
+		uint user_max_mem = 0;
 		opterr = 0;
-		auto c = getopt(argc, argv, "mt:");
-		while(c != -1) {
-			// printf("%d\n", c);
-			switch (c) {
-			case 'm':
-				max_mem_arg = optarg;
-				break;
-			case 't':
-				port_arg = optarg;
-				break;
-			case '?':
-				if(optopt == 'm') {
-					fprintf(stderr, "Option -%c requires a maxmem value.\n", optopt);
-				} else if(optopt == 't') {
-					fprintf(stderr, "Option -%c requires a port number.\n", optopt);
-				} else if(isprint(optopt)) {
-					fprintf(stderr, "Unknown option `-%c'.\n", optopt);
-				} else {
-					fprintf(stderr, "Unknown option character `\\x%x'.\n", optopt);
-					return 1;
-				}
-			default:
-				perror("bad args");
-				return -1;
+		int opt;
+
+		bool is_max = false;
+		bool is_port = false;
+		while((opt = getopt(argc, argv, "m:t:")) != -1) {
+			switch(opt) {
+				case 'm':
+					user_max_mem = atoi(optarg);
+					is_max = true;
+					break;
+				case 't':
+					user_port = atoi(optarg);
+					is_port = true;
+					break;
+				default:
+					fprintf(stderr, "Usage: %s [-t port_no] [-m max_mem]\n", argv[0]);
+					return -1;
 			}
-			c = getopt(argc, argv, "abc:");
 		}
-		if(max_mem_arg) {
-			auto user_max_mem = strtoul(max_mem_arg, NULL, 0);
+		if(is_max) {
 			if(user_max_mem > 0 and user_max_mem <= MAX_MAX_MEMORY) {
 				max_mem = user_max_mem;
-				// printf("1 %d\n", max_mem);
 			} else {
 				fprintf(stderr, "Option -m requires a valid memory size.\n");
+				return -1;
 			}
 		}
-		if(port_arg) {
-			auto user_port = strtoul(port_arg, NULL, 0);
+		if(is_port) {
 			if(user_port > 0 and user_port < 65535) {
 				port = user_port;
-				// printf("2 %d\n", port);
 			} else {
 				fprintf(stderr, "Option -t requires a valid port no.\n");
+				return -1;
 			}
 		}
 	}
 
 	Socket tcp_socket;
 	Socket udp_socket;
-	create_socket(&udp_socket, SOCK_DGRAM, port);
-	create_socket(&tcp_socket, SOCK_STREAM, port);
+	if(create_socket(&udp_socket, SOCK_DGRAM, port) != 0) {
+		return -1;
+	}
+	if(create_socket(&tcp_socket, SOCK_STREAM, port) != 0) {
+		return -1;
+	}
 	uint file_desc_size = 2;
 	pollfd file_descs[2];
 	memset(file_descs, 0, 2*sizeof(pollfd));
@@ -195,16 +190,16 @@ int main(int argc, char** argv) {
 	while(true) {
 		request_total += 1;
 		Socket open_socket;
-		printf("starting poll #%d\n", request_total);
+		// printf("starting poll #%d\n", request_total);
 		auto n = poll(file_descs, file_desc_size, -1);
 		bool is_udp = false;
 		if(tcp_fd->revents == POLLIN) {
 			open_socket = tcp_socket;
-			printf("response on tcp");
+			// printf("response on tcp");
 		} else if(udp_fd->revents == POLLIN) {
 			open_socket = udp_socket;
 			is_udp = true;
-			printf("response on udp");
+			// printf("response on udp");
 		} else if(udp_fd->revents == POLLERR) {
 			printf("udp POLLERR\n");
 			return -1;
@@ -212,11 +207,12 @@ int main(int argc, char** argv) {
 			printf("tcp POLLERR\n");
 			return -1;
 		} else if(udp_fd->revents == POLLNVAL) {
-			create_socket(&udp_socket, SOCK_DGRAM, port);
-			udp_fd->fd = udp_socket.file_desc;
-			udp_fd->events = POLLIN;
-			udp_fd->revents = 0;
-			continue;
+			printf("udp POLLNVAL\n");
+			// create_socket(&udp_socket, SOCK_DGRAM, port);
+			// udp_fd->fd = udp_socket.file_desc;
+			// udp_fd->events = POLLIN;
+			// udp_fd->revents = 0;
+			return -1;
 		} else if(tcp_fd->revents == POLLNVAL) {
 			printf("tcp POLLNVAL\n");
 			return -1;
@@ -231,7 +227,6 @@ int main(int argc, char** argv) {
 			return -1;
 		}
 
-
 		uint new_socket = accept(open_socket.file_desc, open_socket.address, open_socket.address_size);
 		if(new_socket < 0) {
 			perror("accept");
@@ -243,7 +238,7 @@ int main(int argc, char** argv) {
 		const char* response = NULL;
 		uint response_size = 0;
 
-		printf("---REQUEST:\n%.*s\n---\n", message_size, message);
+		// printf("---REQUEST:\n%.*s\n---\n", message_size, message);
 
 		if(message_size >= MAX_MESSAGE_SIZE) {
 			response = TOO_LARGE;
@@ -282,7 +277,7 @@ int main(int argc, char** argv) {
 
 							response = full_buffer;
 							response_size = buffer_size + HEADER_SIZE;
-							printf("value found; was: \"%.*s\"\n", value_size, (const char*)value);
+							// printf("value found; was: \"%.*s\"\n", value_size, (const char*)value);
 						}
 						is_bad_request = false;
 					}
@@ -292,7 +287,7 @@ int main(int argc, char** argv) {
 					response = full_buffer;
 					response_size = sizeof(uint) + HEADER_SIZE;
 					is_bad_request = false;
-					printf("memsize requested; is: \"%d\"\n", i);
+					// printf("memsize requested; is: \"%d\"\n", i);
 				}
 			}
 			if(!is_udp) {
@@ -373,7 +368,7 @@ int main(int argc, char** argv) {
 						message_size -= 9;
 						//-----------
 						//BREAKS HERE
-						printf("%s\n---\n", ACCEPTED);
+						// printf("%s\n---\n", ACCEPTED);
 						send(new_socket, ACCEPTED, HEADER_SIZE, 0);
 						break;
 						//-----------
@@ -404,7 +399,7 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		printf("---RESPONSE:\n%d-%.*s\n---\n", response_size - HEADER_SIZE, response_size, response);
+		// printf("---RESPONSE:\n%d-%.*s\n---\n", response_size - HEADER_SIZE, response_size, response);
 
 		send(new_socket, response, response_size, 0);
 		close(new_socket);
