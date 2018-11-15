@@ -122,8 +122,8 @@ char* parseMessageForGet(char* message, index_type* valSize) {
 }
 
 socketType start_socket(int commType, uint16_t portNum, const char* ipAddress) {
-    // socketType newSocket = socket(AF_INET, commType, 0);
-    // assert(newSocket >= 0 && "Socket creation failed.");
+    socketType newSocket = socket(AF_INET, commType, 0);
+    assert(newSocket >= 0 && "Socket creation failed.");
 
     sockaddr_in serverAddress;
     serverAddress.sin_family = AF_INET;
@@ -161,6 +161,7 @@ int cache_set(cache_type cache, key_type key, val_type val, index_type val_size)
 
     int setSuccess = handleStatusCode(serverReadBuffer, serverReadLength);
 
+    close(setSocket);
     delete[] setRequest;
     delete[] serverReadBuffer;
     return setSuccess;
@@ -184,14 +185,14 @@ val_type cache_get(cache_type cache, key_type key, index_type *val_size) {
     if (getSuccess == 0) {
         char* message = readMessage(serverReadBuffer, serverReadLength);
         char* parsedMessage = parseMessageForGet(message, val_size);
-        // std::cout << parsedMessage << "\n";
         retrievedVal = static_cast<val_type>(parsedMessage);
         delete[] message;
     }
 
+    close(getSocket);
     delete[] getRequest;
     delete[] serverReadBuffer;
-    return retrievedVal; //Placeholder
+    return retrievedVal;
 }
 
 int cache_delete(cache_type cache, key_type key) {
@@ -208,6 +209,7 @@ int cache_delete(cache_type cache, key_type key) {
 
     int deleteSuccess = handleStatusCode(serverReadBuffer, serverReadLength);
 
+    close(deleteSocket);
     delete[] deleteRequest;
     delete[] serverReadBuffer;
     return deleteSuccess;
@@ -234,6 +236,7 @@ index_type cache_space_used(cache_type cache){
         delete[] spaceNumberStr;
     }
 
+    close(spaceUsedSocket);
     delete[] spaceUsedRequest;
     delete[] serverReadBuffer;
     return spaceNumber;
@@ -247,6 +250,8 @@ void destroy_cache(cache_type cache) {
     int sendSuccess = send(destroySocket, destroyRequest, destroyRequestSize, 0);
     assert(sendSuccess >= 0 && "Failed to send destroy request.");
 
+    close(destroySocket);
+    delete cache;
     delete[] destroyRequest;
 }
 

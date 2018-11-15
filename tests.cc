@@ -75,6 +75,7 @@ int test_cache_set_and_get(cache_type cache1) {
         printf("Small value stored or retrieved incorrectly in set/get test. Stored value: %.*s; retrieved value: %.*s; sizes: %d, %d.\n", SMALLVAL_SIZE, SMALLVAL, valsize1_for_get, static_cast<const char*>(retrieved_val), SMALLVAL_SIZE, valsize1_for_get);
         return -1;
     }
+    delete[] static_cast<const char*>(retrieved_val);
 
     cache_set(cache1, KEY1, LARGEVAL, LARGEVAL_SIZE);
     retrieved_val = cache_get(cache1, KEY1, &valsize1_for_get);
@@ -82,12 +83,14 @@ int test_cache_set_and_get(cache_type cache1) {
         printf("Large value stored or retrieved incorrectly in set/get test. Stored value: %.*s; retrieved value: %.*s; sizes: %d, %d.\n", LARGEVAL_SIZE, LARGEVAL, valsize1_for_get, static_cast<const char*>(retrieved_val), LARGEVAL_SIZE, valsize1_for_get);
         return -1;
     }
+    delete[] static_cast<const char*>(retrieved_val);
 
     retrieved_val = cache_get(cache1, UNUSEDKEY, &valsize1_for_get);
     if (retrieved_val != NULL) {
         printf("Unassigned key had value initialized already assigned to it. Expected null pointer; received pointer to value %.*s.\n", valsize1_for_get, static_cast<const char*>(retrieved_val));
         return -1;
     }
+    delete[] static_cast<const char*>(retrieved_val);
 
     return 0;
 }
@@ -99,6 +102,7 @@ int test_cache_delete(cache_type cache1) {
         printf("Small value stored or retrieved incorrectly in delete test. Stored value: %.*s; retrieved value: %.*s; sizes: %d, %d.\n", SMALLVAL_SIZE, SMALLVAL, valsize1_for_get, static_cast<const char*>(retrieved_val), SMALLVAL_SIZE, valsize1_for_get);
         return -1;
     }
+    delete[] static_cast<const char*>(retrieved_val);
 
     cache_delete(cache1, KEY1);
     retrieved_val = cache_get(cache1, KEY1, &valsize1_for_get);
@@ -106,6 +110,7 @@ int test_cache_delete(cache_type cache1) {
         printf("Small value was not deleted cleanly. Expected null pointer; received pointer to value %.*s.\n", valsize1_for_get, static_cast<const char*>(retrieved_val));
         return -1;
     }
+    delete[] static_cast<const char*>(retrieved_val);
 
     cache_set(cache1, KEY1, LARGEVAL, LARGEVAL_SIZE);
     retrieved_val = cache_get(cache1, KEY1, &valsize1_for_get);
@@ -113,6 +118,7 @@ int test_cache_delete(cache_type cache1) {
         printf("Large value stored or retrieved incorrectly in delete test. Stored value: %.*s; retrieved value: %.*s; sizes: %d, %d.\n", LARGEVAL_SIZE, LARGEVAL, valsize1_for_get, static_cast<const char*>(retrieved_val), LARGEVAL_SIZE, valsize1_for_get);
         return -1;
     }
+    delete[] static_cast<const char*>(retrieved_val);
 
     cache_delete(cache1, KEY1);
     retrieved_val = cache_get(cache1, KEY1, &valsize1_for_get);
@@ -120,6 +126,7 @@ int test_cache_delete(cache_type cache1) {
         printf("Large value was not deleted cleanly. Expected null pointer; received pointer to value %.*s.\n", valsize1_for_get, static_cast<const char*>(retrieved_val));
         return -1;
     }
+    delete[] static_cast<const char*>(retrieved_val);
 
     cache_delete(cache1, UNUSEDKEY); //Makes sure no error arises from destroying something nonexistent
 
@@ -173,6 +180,8 @@ int test_hasher(cache_type cache1) {
         printf("Non-identical stored values are read as identical on retrieval. Stored values: %.*s, %.*s; retrieved values: %.*s, %.*s; sizes of retrieved values: %d, %d.\n", SMALLVAL_SIZE, SMALLVAL, LARGEVAL_SIZE, LARGEVAL, valsize1_for_get, static_cast<const char*>(retrieved_val_1), valsize2_for_get, static_cast<const char*>(retrieved_val_2), valsize1_for_get, valsize2_for_get);
         return -1;
     }
+    delete[] static_cast<const char*>(retrieved_val_1);
+    delete[] static_cast<const char*>(retrieved_val_2);
 
     return 0;
 }
@@ -271,7 +280,7 @@ int compositional_testing(uint32_t test_iters, uint32_t internal_iters) {
 int main() {
     int32_t error_pile = 0;
 
-    error_pile += test_create_cache_and_destroy_cache();
+    // error_pile += test_create_cache_and_destroy_cache();
 
     cache_type cache1 = create_cache(CACHE_SIZE, NULL);
     error_pile += test_cache_set_and_get(cache1);
@@ -280,11 +289,11 @@ int main() {
 
     // error_pile += test_resizing(cache1);
     // error_pile += test_cache_space_used(cache1);
-    // // error_pile += test_evictor(cache1););
+    // error_pile += test_evictor(cache1););
     // error_pile += test_serialize(cache1);
 
-    error_pile += compositional_testing(16, 20);
-    // destroy_cache(cache1);
+    // error_pile += compositional_testing(16, 20);
+    destroy_cache(cache1);
 
     delete[] SMALLVAL;
     delete[] LARGEVAL;
