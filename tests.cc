@@ -60,10 +60,10 @@ int test_create_cache_and_destroy_cache() {
     cache_type cache3 = create_cache(SMALL_CACHE_SIZE, NULL);
     cache_type cache4 = create_cache(LARGE_CACHE_SIZE, NULL);
 
-    // destroy_cache(cache1);
-    // destroy_cache(cache2);
-    // destroy_cache(cache3);
-    // destroy_cache(cache4);
+    destroy_cache(cache1);
+    destroy_cache(cache2);
+    destroy_cache(cache3);
+    destroy_cache(cache4);
 
     return 0;
 }

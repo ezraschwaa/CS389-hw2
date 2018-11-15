@@ -75,8 +75,6 @@ uint32_t getStatusCodeIndex(char* sourceBuffer, int sourceBufferLength) {
 }
 
 int handleStatusCode(char* sourceBuffer, int sourceBufferLength) {
-    char* statusCode;
-
     int success = -1;
     uint32_t statusCodeIndex = getStatusCodeIndex(sourceBuffer, sourceBufferLength);
     if (sourceBuffer[statusCodeIndex] == '2') {
@@ -115,7 +113,7 @@ char* parseMessageForGet(char* message, index_type* valSize) {
     valIndex += 4; //+4 for reading val size
 
     char* parsedMessage = new char[*valSize];
-    for (int i = 0; i < *valSize; i++) {
+    for (uint i = 0; i < *valSize; i++) {
         parsedMessage[i] = message[i + valIndex];
     }
     return parsedMessage;
