@@ -52,7 +52,7 @@
     Random ordering of requests, pending assumptions
 
 8: Design experiments
-    Toss our selected workload at the server, varying requests per second and average val size according to 
+    Toss our selected workload at the server, varying requests per second and average val size in accord with our factors' listed gradations; re-run experiment between different machines in order to measure results with varied network speed
 
 9: Analyze and interpret data
 
