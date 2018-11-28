@@ -173,8 +173,8 @@ val_type cache_get(cache_type cache, key_type key, index_type *val_size) {
     int sendSuccess = send(getSocket, getRequest, getRequestSize, 0);
     assert(sendSuccess >= 0 && "Failed to send space used request.");
 
-    char* serverReadBuffer = new char[2048 + *val_size];
-    int serverReadLength = read(getSocket, serverReadBuffer, 2048 + *val_size);
+    char* serverReadBuffer = new char[2048];
+    int serverReadLength = read(getSocket, serverReadBuffer, 2048);
     assert(serverReadLength >= 0 && "Failed to read from server.");
 
     int getSuccess = handleStatusCode(serverReadBuffer, serverReadLength);
