@@ -184,21 +184,67 @@ int time_function(int (*test_function) (cache_type), cache_type cache1, int iter
 	return final_time;
 }
 
+int time_create_cache(int iterate = 1){
+    int count = 0;
+    cache_type caches = [iterate]
+    auto start = high_resolution_clock::now();
+    while (count < iterate){
+        caches[count] = create_cache(CACHE_SIZE, NULL);
+        ++count;
+    }
+    auto stop = high_resolution_clock::now(); 
+    auto duration = duration_cast<microseconds>(stop - start); 
+
+    count = 0
+    while (count < iterate){
+        destroy_cache(caches[0]);
+    }
+    auto final_time = duration.count() / iterate;
+    return final_time;
+}
+int time_destroy_cache(int iterate = 1){
+    int count = 0;
+
+    cache_type caches = [iterate];
+    while (count < iterate){
+        caches[count] = create_cache(CACHE_SIZE, NULL);
+    }
+
+    auto start = high_resolution_clock::now();
+    while (count < iterate){
+        destroy_cache(caches[count]);
+        ++count;
+    }
+    auto stop = high_resolution_clock::now(); 
+    auto duration = duration_cast<microseconds>(stop - start); 
+
+    auto final_time = duration.count() / iterate;
+    return final_time;
+}
+int time_
+
 int 
 main()
 {
 	cache_type cache1 = create_cache(CACHE_SIZE, NULL);
+    int ITERATIONS = 1
 
-	cout << "Time taken to create and destroy cache: "
+    cout << "Time to create a cache: " << time_create_cache(ITERATIONS) << " microseconds" << endl;
+    cout << "Time to destroy a cache: " << time_destroy_cache(ITERATIONS) << " microseconds" << endl;
+
+
+    //Times the tests itself.  Not great for measuring the actual metrics. 
+    cout << "TIMING TESTS:"
+	cout << "Time taken to run test: create and destroy cache: "
 	     << time_function(test_create_cache_and_destroy_cache, cache1) << " microseconds" << endl;
 
-	cout << "Time taken to set and get: "
+	cout << "Time taken to run test: set and get: "
 	     << time_function(test_cache_set_and_get, cache1) << " microseconds" << endl;
 
-	cout << "Time taken to delete: "
+	cout << "Time taken to run test: delete: "
 	     << time_function(test_cache_delete, cache1) << " microseconds" << endl;
 
-	cout << "Time taken to check space_used: "
+	cout << "Time taken to run test: check space_used: "
 	     << time_function(test_cache_space_used, cache1) << " microseconds" << endl;
 
 	destroy_cache(cache1);
