@@ -168,34 +168,6 @@ int test_cache_space_used(cache_type cache1) {
     return 0;
 }
 
-int test_hasher(cache_type cache1) {
-    cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
-    cache_set(cache1, KEY2, LARGEVAL, LARGEVAL_SIZE);
-    val_type retrieved_val_1 = cache_get(cache1, KEY1, &valsize1_for_get);
-    val_type retrieved_val_2 = cache_get(cache1, KEY2, &valsize2_for_get);
-    if ((valsize1_for_get == valsize2_for_get) && !memcmp(retrieved_val_1, retrieved_val_2, valsize1_for_get)) {
-        printf("Non-identical stored values are read as identical on retrieval. Stored values: %.*s, %.*s; retrieved values: %.*s, %.*s; sizes of retrieved values: %d, %d.\n", SMALLVAL_SIZE, SMALLVAL, LARGEVAL_SIZE, LARGEVAL, valsize1_for_get, static_cast<const char*>(retrieved_val_1), valsize2_for_get, static_cast<const char*>(retrieved_val_2), valsize1_for_get, valsize2_for_get);
-        return -1;
-    }
-    delete[] static_cast<const char*>(retrieved_val_1);
-    delete[] static_cast<const char*>(retrieved_val_2);
-
-    return 0;
-}
-
-int test_resizing(cache_type cache1) {
-    const int ONE_MORE_THAN_CAPACITY = 129; //Should be enough to make the cache resize, or to throw an error if it fails
-
-    key_type activekey;
-    for (index_type i = 0; i < ONE_MORE_THAN_CAPACITY; i++) {
-        activekey = make_str_of_defined_length(i + 2);
-        cache_set(cache1, activekey, LARGEVAL, LARGEVAL_SIZE);
-        delete[] activekey;
-    }
-
-    return 0;
-}
-
 
 int time_function(int (*test_function) (cache_type), cache_type cache1, int iterate = 1) {
 	int count = 0;
