@@ -37,7 +37,7 @@ uint min(uint a, uint b) {
 
 void generate_string(char* buffer, uint size) {
 	for(uint i = 0; i < size - 1; i += 1) {
-		buffer[i] = (rand()%(126 - 33 + 1)) + 33;
+		buffer[i] = pcg_random_bound(33, 126);
 	}
 	buffer[size - 1] = 0;
 }
