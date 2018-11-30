@@ -6,6 +6,7 @@
 #include "types.h"
 
 
+
 void create_evictor(Evictor* evictor, evictor_type policy);
 constexpr Index get_evictor_mem_size(evictor_type policy, Index entry_capacity) {
 	if(policy == FIFO or policy == LIFO or policy == LRU or policy == MRU or policy == CLOCK or policy == SLRU) {

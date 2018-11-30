@@ -8,3 +8,7 @@ eviction.o
 book.h.gch
 test
 types.h.gch
+.gitignore
+server.o
+client
+server

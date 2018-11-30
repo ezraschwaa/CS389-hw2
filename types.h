@@ -15,6 +15,16 @@ using Hash_func = hash_func;
 //different evictors want to use memory differently
 //we define these different types of memory here and combine them all in a union so that each policy has access to its data
 //Evictor goes on the cache itself, Evict_item goes on each individual entry
+enum evictor_type {//evictor_types
+	FIFO,
+	LIFO,
+	LRU,
+	MRU,
+	CLOCK,
+	SLRU,
+	RR,
+};
+
 struct Node {
 	Index next;
 	Index pre;
