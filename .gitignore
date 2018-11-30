@@ -12,3 +12,4 @@ types.h.gch
 server.o
 client
 server
+benchmark

@@ -23,5 +23,9 @@ cache_test:
 	$(CPP) -g types.h book.h client.cc eviction.cc -o test tests.cc;
 	./test;
 
+benchmark:
+	$(CPP) -g cache.h client.cc workload.cc random.hh -o benchmark;
+	./benchmark;
+
 clean:
 	rm -f *.o; rm -f *.h.gch; rm test

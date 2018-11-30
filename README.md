@@ -24,11 +24,7 @@ We listed off three services performed by the cache server, each with an array o
 
 ## 3: Select Metrics
 
-We settled on two metrics to pay attention to.
-
-First, average response time for a given set of parameters.
-
-Second, sustained throughput, defined as the highest messages-per-second rate at which average response time remains below 1 second.
+We chose to focus exclusively on sustained throughput, defined as the highest messages-per-second rate at which average response time remains below 1 second.
 
 ## 4: List Parameters
 
@@ -52,10 +48,7 @@ We settled on three parameters to treat as factors of interest and use as the in
 
 * Factor 1: number of requests per second
     * Level 1: 2^4
-    * Higher levels: 2^5, 2^6, et cetera, up to 2^16
-* Factor 2: average value size
-    * Level 1: 10
-    * Level 2: 10,000
+    * Higher levels: 2^5, 2^6, et cetera, increasing until we get a mean time over 1ms
 * Factor 3: network speed
     * Level 1: network is localhost
     * Level 2: network is some non-localhost network
