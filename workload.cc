@@ -71,37 +71,46 @@ double get_network_latency(cache_obj* cache, uint iterations) {
 	return (((double)(cur_time - pre_time))/iterations)/CLOCKS_PER_SEC;
 }
 
-bool myworkload(cache_obj* cache, uint requests_per_second, uint mean_string_size, uint std_string_size, uint total_requests) {
+bool workload(cache_obj* cache, uint requests_per_second, uint mean_string_size, uint std_string_size, uint total_requests) {
 	mean_string_size = sqrt(mean_string_size);
 	std_string_size = sqrt(std_string_size);
-	char buffer[MAX_STRING_SIZE];
-	char* set_key[SET_KEY_SIZE];
+	char buffer[MAX_STRING_SIZE] = {};
+	char* set_key[SET_KEY_SIZE] = {};
 
-	double network_latency = get_network_latency(cache, 50);
+	double network_latency = get_network_latency(cache, 20);
 
 	clock_t time_per_request = CLOCKS_PER_SEC/requests_per_second;
 	clock_t pre_time = clock();
-	clock_t origin_time = pre_time;
+	clock_t total_sleep_time = 0;
+	clock_t total_request_time = 0;
+	clock_t pre_sleep_time = pre_time;
+	clock_t cur_sleep_time = 0;
+	clock_t pre_request_time = 0;
+	clock_t cur_request_time = 0;
 
 	uint overflow = 0;
 	for(uint i = 0; i < total_requests; i += 1) {
+		pre_sleep_time = clock();
 		double r = pcg_random_uniform();
 		if(r < .65) {//GET
-			char* key;
+			char* key = NULL;
 			if(r/.65 < .6) {
 				key = get_string_or_null(set_key, SET_KEY_SIZE);
-			} else {
+			}
+			if(!key) {
 				double r_size = random_normal(mean_string_size, std_string_size);
 				uint key_size = min(MAX_STRING_SIZE, static_cast<uint>(r_size*r_size + 2));
 				generate_string(buffer, key_size);
 				key = buffer;
 			}
 			uint value_size;
+			pre_request_time = clock();
 			const void* value = cache_get(cache, key, &value_size);
+			cur_request_time = clock();
 			if(value) {
 				delete[] (char*)value;
 			}
-		} else if(r < .7) {//SET
+		} else if(r < .8) {//SET
 			double r_size = random_normal(mean_string_size, std_string_size);
 			uint key_size = static_cast<uint>(r_size*r_size + 2);
 			char* key = new char[key_size];
@@ -112,7 +121,9 @@ bool myworkload(cache_obj* cache, uint requests_per_second, uint mean_string_siz
 			auto value = &buffer[key_size];
 			generate_string(value, value_size);
 
+			pre_request_time = clock();
 			cache_set(cache, key, value, value_size);
+			cur_request_time = clock();
 			add_string(set_key, SET_KEY_SIZE, key);
 		} else {//DELETE
 			char* key;
@@ -124,29 +135,34 @@ bool myworkload(cache_obj* cache, uint requests_per_second, uint mean_string_siz
 				generate_string(buffer, key_size);
 				key = buffer;
 			}
+			pre_request_time = clock();
 			cache_delete(cache, buffer);
+			cur_request_time = clock();
 		}
+		total_request_time += cur_request_time - pre_request_time;
 
-		clock_t cur_time = clock();
-		uint d = (cur_time - pre_time);
-		int sleep_time = time_per_request - d;
+		cur_sleep_time = clock();
+		int sleep_time = time_per_request - (cur_sleep_time - pre_sleep_time);
 		if(sleep_time > 0) {
-			usleep((1000000*sleep_time)/CLOCKS_PER_SEC);
+			total_sleep_time += sleep_time;
+			uint nan = (1e9*(double)sleep_time/CLOCKS_PER_SEC);
+			timespec t = {0, (long)nan};
+			nanosleep(&t, NULL);
 		} else {
 			overflow += 1;
 		}
-		pre_time = cur_time;
  	}
-	clock_t cur_time = clock();
-	bool is_valid = ((((double)(cur_time - origin_time))/CLOCKS_PER_SEC)/total_requests - network_latency) < .001;
+	double average_time = (((double)(total_request_time))/CLOCKS_PER_SEC)/total_requests;
+	bool is_valid = average_time < .001;
 
+	printf("Average time: %fms\n", 1e3*average_time);
 	if(overflow > 0) {
 		printf("Request time took longer than desired %d times\n", overflow);
 	}
-	if(is_valid and overflow > total_requests/2) {
-		printf("More than half of the requests overflowed! The server is faster than the client\n");
-		return false;
-	}
+	// if(is_valid and overflow > total_requests/2) {
+	// 	printf("More than half of the requests overflowed! The server is faster than the client\n");
+	// 	return false;
+	// }
 	return is_valid;
 }
 
@@ -157,12 +173,17 @@ bool myworkload(cache_obj* cache, uint requests_per_second, uint mean_string_siz
 
 int main() {
 	auto cache = create_cache(0, NULL);
-	uint i = 4;
-	for(;; i += 1) {
-		bool is_valid = myworkload(cache, 1<<i, 25, 4, 100);
-		if(!is_valid) break;
-	}
+	uint i = 6;
+	// while(true) {
+		i = 6;
+		for(;i < 31; i += 1) {
+			printf("Starting %d\n", 1<<i);
+			bool is_valid = workload(cache, 1<<i, 250, 4, 1000);
+			if(!is_valid) break;
+			sleep(1);
+		}
+	// }
 	printf("The highest number of request per second reached was %d\n", 1<<(i - 1));
-	destroy_cache(cache);
+	// destroy_cache(cache);
 	return 0;
 }

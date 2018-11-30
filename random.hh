@@ -95,17 +95,18 @@ inline uint32_t pcg_random_bound(uint32_t lower, uint32_t upper) {
 // pcg32_boundedrand(bound):
 // pcg32_boundedrand_r(rng, bound):
 //     Generate a uniformly distributed number, r, where 0 <= r < 1
+
 inline double pcg_random_uniform(PCG* rng = &pcg_global) {
 	uint32_t r = pcg_random32(rng);
-	return ((double)r)/(((double)~0) + 1);
+	return ((double)r)/(((double)(unsigned)~0) + 1);
 }
 //     Generate a uniformly distributed number, r, where 0 <= r <= 1
 inline double pcg_random_uniform_in(PCG* rng = &pcg_global) {
 	uint32_t r = pcg_random32(rng);
-	return ((double)r)/((double)~0);
+	return ((double)r)/((double)(unsigned)~0);
 }
 //     Generate a uniformly distributed number, r, where 0 < r < 1
 inline double pcg_random_uniform_ex(PCG* rng = &pcg_global) {
 	uint32_t r = pcg_random32(rng);
-	return (((double)r) + 1)/(((double)~0) + 2);
+	return (((double)r) + 1)/(((double)(unsigned)~0) + 2);
 }
