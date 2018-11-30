@@ -71,7 +71,7 @@ double get_network_latency(cache_obj* cache, uint iterations) {
 	return (((double)(cur_time - pre_time))/iterations)/CLOCKS_PER_SEC;
 }
 
-bool workload(cache_obj* cache, uint requests_per_second, uint mean_string_size, uint std_string_size, uint total_requests) {
+bool myworkload(cache_obj* cache, uint requests_per_second, uint mean_string_size, uint std_string_size, uint total_requests) {
 	mean_string_size = sqrt(mean_string_size);
 	std_string_size = sqrt(std_string_size);
 	char buffer[MAX_STRING_SIZE];
@@ -159,7 +159,7 @@ int main() {
 	auto cache = create_cache(0, NULL);
 	uint i = 4;
 	for(;; i += 1) {
-		bool is_valid = workload(cache, 1<<i, 25, 4, 100);
+		bool is_valid = myworkload(cache, 1<<i, 25, 4, 100);
 		if(!is_valid) break;
 	}
 	printf("The highest number of request per second reached was %d\n", 1<<(i - 1));
