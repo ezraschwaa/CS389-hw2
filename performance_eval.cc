@@ -100,7 +100,6 @@ int test_cache_set(cache_type cache) {
             cout << "\tAVG Time to set "<< valSize[i] << " sized val in " << sizeArray[j] << " sized cache: " << timer << " nanoseconds" << endl;
         }
     }
-    free(values);
     return 0;
 }
 int test_cache_delete(cache_type cache) {
@@ -130,16 +129,12 @@ int test_cache_delete(cache_type cache) {
     }
     int count = 0;
     float timer = 0;
-    free(values);
 
     return 0;
 }
 int test_cache_get() {
     index_type sizeArray[] = {SMALL_CACHE_SIZE, CACHE_SIZE, LARGE_CACHE_SIZE};
     cache_type cacheArray[] = {create_cache(SMALL_CACHE_SIZE, NULL), create_cache(CACHE_SIZE, NULL), create_cache(LARGE_CACHE_SIZE, NULL)};
-
-    const char* values[] = {SMALLVAL, LARGEVAL};
-    index_type valSize[] = {SMALLVAL_SIZE, LARGEVAL_SIZE};
 
     for(int i = 0; i < 3; i++) {
         int count = 0;
@@ -231,7 +226,6 @@ int test_cache_get() {
     //     cout << "\tAverage time for get of discrete filled "<< sizeArray[i] << " cache: " << timer << " nanoseconds" << endl;
     //     destroy_cache(cacheArray[i]);
     // }
-    free(values);
     return 0;
 }
 
