@@ -126,19 +126,17 @@ int test_cache_get() {
     index_type sizeArray[] = {SMALL_CACHE_SIZE, CACHE_SIZE, LARGE_CACHE_SIZE};
     cache_type cacheArray[] = {create_cache(SMALL_CACHE_SIZE, NULL), create_cache(CACHE_SIZE, NULL), create_cache(LARGE_CACHE_SIZE, NULL)};
     
-    val_type retrieved_val;
     for(int i = 0; i < 3; i++) {
         int count = 0;
         float timer = 0;
         while (count < TRIALS){
             auto start = high_resolution_clock::now();
-            retrieved_val = cache_get(cacheArray[i], KEY1, &valsize1_for_get);
+            cache_get(cacheArray[i], KEY1, &valsize1_for_get);
             auto stop = high_resolution_clock::now();
             auto duration = duration_cast<nanoseconds>(stop - start);
 
             timer += duration.count();
             ++count;
-            delete[] static_cast<const char*>(retrieved_val);
         }
         timer = (timer / TRIALS);
         cout << "\tAverage time to get in empty "<< sizeArray[i] << " bit cache: " << timer << " nanoseconds" << endl;
@@ -154,13 +152,12 @@ int test_cache_get() {
         float timer = 0;
         while (count < TRIALS){
             auto start = high_resolution_clock::now();
-            retrieved_val = cache_get(cacheArray[i], KEY1, &valsize1_for_get);
+            cache_get(cacheArray[i], KEY1, &valsize1_for_get);
             auto stop = high_resolution_clock::now();
             auto duration = duration_cast<nanoseconds>(stop - start);
 
             timer += duration.count();
             ++count;
-            delete[] static_cast<const char*>(retrieved_val);
         }
         timer = (timer / TRIALS);
         cout << "\tAverage time to get in 1/2filled "<< sizeArray[i] << " cache: " << timer << " nanoseconds" << endl;
@@ -176,18 +173,41 @@ int test_cache_get() {
         float timer = 0;
         while (count < TRIALS){
             auto start = high_resolution_clock::now();
-            retrieved_val = cache_get(cacheArray[i], KEY1, &valsize1_for_get);
+            cache_get(cacheArray[i], KEY1, &valsize1_for_get);
             auto stop = high_resolution_clock::now();
             auto duration = duration_cast<nanoseconds>(stop - start);
 
             timer += duration.count();
             ++count;
-            delete[] static_cast<const char*>(retrieved_val);
         }
         timer = (timer / TRIALS);
         cout << "\tAverage time for space used of filled "<< sizeArray[i] << " cache: " << timer << " nanoseconds" << endl;
     }
 
+    for(int j = 0; j < 3; j++){
+        index_type size = sizeArray[j];
+        for(int numOfValues = 0; numOfValues < size; numOfValues++){
+            cache_set(cacheArray[j], itoa(numOfValues), make_str_of_defined_length(2), 1);
+        }
+    }
+
+    for(int i = 0; i < 3; i++) {
+        int count = 0;
+        float timer = 0;
+        while (count < TRIALS){
+            key_type randKEY = itoa(rand() % sizeArray[i]);
+
+            auto start = high_resolution_clock::now();
+            cache_get(cacheArray[i], randKEY, &valsize1_for_get);
+            auto stop = high_resolution_clock::now();
+            auto duration = duration_cast<nanoseconds>(stop - start);
+
+            timer += duration.count();
+            ++count;
+        }
+        timer = (timer / TRIALS);
+        cout << "\tAverage time for space used of filled "<< sizeArray[i] << " cache: " << timer << " nanoseconds" << endl;
+    }
     return 0;
 }
 
