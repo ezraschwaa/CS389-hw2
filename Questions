@@ -1,7 +1,3 @@
-1. The goal of this system is to store information (in the form of key-value pairs) in a cache on a server which can be queried by key or manipulated (information deletion or addition) over a network by a client.
-    The system boundaries include that access to a network is required for ...
-    
-
 
 1. The goal of this evaluation is to determine how the performance of this networked cache scales with the networked cache's parameters (discussed in part 4). We are comparing cache performance with different workloads on the same machine at approximately the same time to minimize the impact of extraneous variables beyond the system's boundaries such as background processes on our machine and general internet speed. We only want to measure the relative difference of performance for different parameter values.
 
