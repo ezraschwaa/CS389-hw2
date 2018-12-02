@@ -184,18 +184,21 @@ int test_cache_get() {
         cout << "\tAverage time for space used of filled "<< sizeArray[i] << " cache: " << timer << " nanoseconds" << endl;
     }
 
-    for(int j = 0; j < 3; j++){
+    for(int j = 0; j < 2; j++){
         index_type size = sizeArray[j];
         for(int numOfValues = 0; numOfValues < size; numOfValues++){
-            cache_set(cacheArray[j], itoa(numOfValues), make_str_of_defined_length(2), 1);
+            string numString = to_string(numOfValues);
+            key_type numChar = numString.c_str();
+            cache_set(cacheArray[j], numChar, make_str_of_defined_length(2), 1);
         }
     }
 
-    for(int i = 0; i < 3; i++) {
+    for(int i = 0; i < 2; i++) {
         int count = 0;
         float timer = 0;
         while (count < TRIALS){
-            key_type randKEY = itoa(rand() % sizeArray[i]);
+            string randk = to_string(rand() % sizeArray[i]);
+            key_type randKEY = randk.c_str();
 
             auto start = high_resolution_clock::now();
             cache_get(cacheArray[i], randKEY, &valsize1_for_get);
