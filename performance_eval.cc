@@ -46,206 +46,240 @@ const index_type LARGEVAL_SIZE = 127;
 index_type valsize1_for_get = 0;
 index_type valsize2_for_get = 0;
 
+int TRIALS = 1000000;
+
 ////////////////////
 // Test Functions //
 ////////////////////
 
 // Test to ensure that cache creation and destruction work with different cache sizes and presence or absence of user-input hash functions, to ensure that any errors which may arise from doing so arise
-int test_create_cache_and_destroy_cache(cache_type empty) {
-	//ignore the parameter for now
-    cache_type cache1 = create_cache(CACHE_SIZE, NULL);
-    cache_type cache2 = create_cache(CACHE_SIZE, &bad_hash_func);
-    cache_type cache3 = create_cache(SMALL_CACHE_SIZE, NULL);
+int test_create_cache_and_destroy_cache() {
+    index_type sizeArray[] = {SMALL_CACHE_SIZE, CACHE_SIZE, LARGE_CACHE_SIZE};
 
-    auto start = high_resolution_clock::now();
-    cache_type cache4 = create_cache(LARGE_CACHE_SIZE, NULL);
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop - start);
-    cout << "Time to create a large cache: " << duration.count() << " microseconds" << endl;
+    for(int i = 0; i < 3; i++) {
+        int count = 0;
+        float timer = 0;
+        while (count < TRIALS){
+            auto start = high_resolution_clock::now();
+            cache_type cache = create_cache(sizeArray[i], NULL);
+            auto stop = high_resolution_clock::now();
+            auto duration = duration_cast<nanoseconds>(stop - start);
 
-    destroy_cache(cache1);
-    destroy_cache(cache2);
-    destroy_cache(cache3);
-    destroy_cache(cache4);
-
+            timer += duration.count();
+            ++count;
+            destroy_cache(cache);
+        }
+        timer = (timer / TRIALS);
+        cout << "\tAverage time to create a cache of size "<< sizeArray[i] << ": " << timer << " nanoseconds" << endl;
+    }
     return 0;
 }
 
-int test_cache_set_and_get(cache_type cache1) {
+int test_cache_set(cache_type cache) {
+    const char* values[] = {SMALLVAL, LARGEVAL};
+    index_type valSize[] = {SMALLVAL_SIZE, LARGEVAL_SIZE};
 
-    auto start = high_resolution_clock::now();
-    cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop-start);
-    cout << "time to set small value: " << duration.count() << " microseconds" << endl;
+    for(int i = 0; i < 2; i++) {
+        int count = 0;
+        float timer = 0;
+        while (count < TRIALS){
+            auto start = high_resolution_clock::now();
+            cache_set(cache, KEY1, values[i], valSize[i]);
+            auto stop = high_resolution_clock::now();
+            auto duration = duration_cast<nanoseconds>(stop - start);
 
-    val_type retrieved_val = cache_get(cache1, KEY1, &valsize1_for_get);
-    if ((valsize1_for_get != SMALLVAL_SIZE) || memcmp(retrieved_val, SMALLVAL, SMALLVAL_SIZE)) {
-        printf("Small value stored or retrieved incorrectly in set/get test. Stored value: %.*s; retrieved value: %.*s; sizes: %d, %d.\n", SMALLVAL_SIZE, SMALLVAL, valsize1_for_get, static_cast<const char*>(retrieved_val), SMALLVAL_SIZE, valsize1_for_get);
-        return -1;
+            timer += duration.count();
+            ++count;
+            cache_delete(cache, KEY1);
+        }
+        timer = (timer / TRIALS);
+        cout << "\tAverage time to set a val of size "<< valSize[i] << ": " << timer << " nanoseconds" << endl;
     }
-    delete[] static_cast<const char*>(retrieved_val);
+    return 0;
+}
+int test_cache_delete(cache_type cache) {
+    const char* values[] = {SMALLVAL, LARGEVAL};
+    index_type valSize[] = {SMALLVAL_SIZE, LARGEVAL_SIZE};
 
-    auto start = high_resolution_clock::now();
-    cache_set(cache1, KEY1, LARGEVAL, LARGEVAL_SIZE);
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop-start);
-    cout << "time to set big value: " << duration.count() << " microseconds" << endl;
+    for(int i = 0; i < 2; i++) {
+        int count = 0;
+        float timer = 0;
+        while (count < TRIALS){
+            cache_set(cache, KEY1, values[i], valSize[i]);
+            auto start = high_resolution_clock::now();
+            cache_delete(cache, KEY1);
+            auto stop = high_resolution_clock::now();
+            auto duration = duration_cast<nanoseconds>(stop - start);
 
-    retrieved_val = cache_get(cache1, KEY1, &valsize1_for_get);
-    if ((valsize1_for_get != LARGEVAL_SIZE) || memcmp(retrieved_val, LARGEVAL, LARGEVAL_SIZE)) {
-        printf("Large value stored or retrieved incorrectly in set/get test. Stored value: %.*s; retrieved value: %.*s; sizes: %d, %d.\n", LARGEVAL_SIZE, LARGEVAL, valsize1_for_get, static_cast<const char*>(retrieved_val), LARGEVAL_SIZE, valsize1_for_get);
-        return -1;
+            timer += duration.count();
+            ++count;
+        }
+        timer = (timer / TRIALS);
+        cout << "\tAverage time to delete val of size "<< valSize[i] << ": " << timer << " nanoseconds" << endl;
     }
-    delete[] static_cast<const char*>(retrieved_val);
-
-    retrieved_val = cache_get(cache1, UNUSEDKEY, &valsize1_for_get);
-    if (retrieved_val != NULL) {
-        printf("Unassigned key had value initialized already assigned to it. Expected null pointer; received pointer to value %.*s.\n", valsize1_for_get, static_cast<const char*>(retrieved_val));
-        return -1;
-    }
-    delete[] static_cast<const char*>(retrieved_val);
+    int count = 0;
+    float timer = 0;
 
     return 0;
 }
-
-int test_cache_delete(cache_type cache1) {
-    cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
+int test_cache_get() {
+    index_type sizeArray[] = {SMALL_CACHE_SIZE, CACHE_SIZE, LARGE_CACHE_SIZE};
+    cache_type cacheArray[] = {create_cache(SMALL_CACHE_SIZE, NULL), create_cache(CACHE_SIZE, NULL), create_cache(LARGE_CACHE_SIZE, NULL)};
     
-    auto start = high_resolution_clock::now();
-    cache_delete(cache1, KEY1);
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop - start);
-    retrieved_val = cache_get(cache1, KEY1, &valsize1_for_get);
-    
-    cout << "Time to delete small value: " << duration.count() << " microseconds" << endl;
+    val_type retrieved_val;
+    for(int i = 0; i < 3; i++) {
+        int count = 0;
+        float timer = 0;
+        while (count < TRIALS){
+            auto start = high_resolution_clock::now();
+            retrieved_val = cache_get(cacheArray[i], KEY1, &valsize1_for_get);
+            auto stop = high_resolution_clock::now();
+            auto duration = duration_cast<nanoseconds>(stop - start);
 
-    if (retrieved_val != NULL) {
-        printf("Small value was not deleted cleanly. Expected null pointer; received pointer to value %.*s.\n", valsize1_for_get, static_cast<const char*>(retrieved_val));
-        return -1;
-    }
-    delete[] static_cast<const char*>(retrieved_val);
-
-    cache_set(cache1, KEY1, LARGEVAL, LARGEVAL_SIZE);
-    
-    auto start = high_resolution_clock::now();
-    cache_delete(cache1, KEY1);    
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop - start);
-    cout << "Time to delete big value: " << duration.count() << " microseconds" << endl;
-
-    retrieved_val = cache_get(cache1, KEY1, &valsize1_for_get);
-    if (retrieved_val != NULL) {
-        printf("Large value was not deleted cleanly. Expected null pointer; received pointer to value %.*s.\n", valsize1_for_get, static_cast<const char*>(retrieved_val));
-        return -1;
-    }
-    delete[] static_cast<const char*>(retrieved_val);
-
-    cache_delete(cache1, UNUSEDKEY); //Makes sure no error arises from destroying something nonexistent
-
-    return 0;
-}
-
-int test_cache_space_used(cache_type cache1) {
-
-    auto start = high_resolution_clock::now();
-    const index_type space1 = cache_space_used(cache1);
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop - start);
-    cout << "Time to get space used of empty cache: " << duration.count() << " microseconds" << endl;
-    if (space1 != 0) {
-        std::cout << "Cache was not initialized with 0 space used. Space filled on initialization: " << space1 << ".\n";
-        return -1;
+            timer += duration.count();
+            ++count;
+            delete[] static_cast<const char*>(retrieved_val);
+        }
+        timer = (timer / TRIALS);
+        cout << "\tAverage time to get in empty "<< sizeArray[i] << " bit cache: " << timer << " nanoseconds" << endl;
     }
 
-    cache_set(cache1, KEY1, SMALLVAL, SMALLVAL_SIZE);
-    auto start = high_resolution_clock::now();
-    const index_type space2 = cache_space_used(cache1);
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop - start);
-    cout << "Time to get space used of cache with one (small) item: " << duration.count() << " microseconds" << endl;
-    if (space2 != SMALLVAL_SIZE) {
-        std::cout << "Cache failed to add used space from small input value. Previous space used: " << space1 << "; expected space used: " << SMALLVAL_SIZE << "; reported space used: " << space2 << ".\n";
-        return -1;
+    //fill up caches halfway
+    for(int j = 0; j < 3; j++){
+        index_type size = sizeArray[j] / 2;
+        cache_set(cacheArray[j], KEY1, make_str_of_defined_length(size), size);
+    }
+    for(int i = 0; i < 3; i++) {
+        int count = 0;
+        float timer = 0;
+        while (count < TRIALS){
+            auto start = high_resolution_clock::now();
+            retrieved_val = cache_get(cacheArray[i], KEY1, &valsize1_for_get);
+            auto stop = high_resolution_clock::now();
+            auto duration = duration_cast<nanoseconds>(stop - start);
+
+            timer += duration.count();
+            ++count;
+            delete[] static_cast<const char*>(retrieved_val);
+        }
+        timer = (timer / TRIALS);
+        cout << "\tAverage time to get in 1/2filled "<< sizeArray[i] << " cache: " << timer << " nanoseconds" << endl;
     }
 
-    cache_set(cache1, KEY2, LARGEVAL, LARGEVAL_SIZE);
-    auto start = high_resolution_clock::now();
-    const index_type space3 = cache_space_used(cache1);
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop - start);
-    cout << "Time to get space used of cache with a big item:" << duration.count() << " microseconds" << endl;
-    if (space3 != (SMALLVAL_SIZE + LARGEVAL_SIZE)) {
-        std::cout << "Cache failed to add used space from large input value. Previous space used: " << space2 << "; expected space used: " << (SMALLVAL_SIZE + LARGEVAL_SIZE) << "; reported space used: " << space3 << ".\n";
-        return -1;
+    for(int j = 0; j < 3; j++){
+        index_type size = sizeArray[j];
+        cache_set(cacheArray[j], KEY1, make_str_of_defined_length(size), size);
     }
 
-    cache_delete(cache1, KEY1);
-    auto start = high_resolution_clock::now();
-    const index_type space4 = cache_space_used(cache1);
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop - start);
-    cout << "Time to get space used of deleted small item: " << duration.count() << " microseconds" << endl;
-    if (space4 != LARGEVAL_SIZE) {
-        std::cout << "Cache failed to remove space from large deleted value. Previous space used: " << space3 << "; expected new space used: " << LARGEVAL_SIZE << "reported new space used: " << space4 << ".\n";
-        return -1;
-    }
+    for(int i = 0; i < 3; i++) {
+        int count = 0;
+        float timer = 0;
+        while (count < TRIALS){
+            auto start = high_resolution_clock::now();
+            retrieved_val = cache_get(cacheArray[i], KEY1, &valsize1_for_get);
+            auto stop = high_resolution_clock::now();
+            auto duration = duration_cast<nanoseconds>(stop - start);
 
-    cache_delete(cache1, KEY2);
-    auto start = high_resolution_clock::now();
-    const index_type space5 = cache_space_used(cache1);
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop - start);
-    cout << "Time to get space used of deleted big item: " << duration.count() << " microseconds" << endl;
-    if (space5 != 0) {
-        std::cout << "Cache failed to remove space from small deleted value. Previous space used: " << space4 << "; expected new space used: 0; reported new space used: " << space5 << ".\n";
-        return -1;
+            timer += duration.count();
+            ++count;
+            delete[] static_cast<const char*>(retrieved_val);
+        }
+        timer = (timer / TRIALS);
+        cout << "\tAverage time for space used of filled "<< sizeArray[i] << " cache: " << timer << " nanoseconds" << endl;
     }
 
     return 0;
 }
 
+int test_cache_space_used(){
+    index_type sizeArray[] = {SMALL_CACHE_SIZE, CACHE_SIZE, LARGE_CACHE_SIZE};
+    cache_type cacheArray[] = {create_cache(SMALL_CACHE_SIZE, NULL), create_cache(CACHE_SIZE, NULL), create_cache(LARGE_CACHE_SIZE, NULL)};
+    
+    index_type space;
+    for(int i = 0; i < 3; i++) {
+        int count = 0;
+        float timer = 0;
+        while (count < TRIALS){
+            auto start = high_resolution_clock::now();
+            space = cache_space_used(cacheArray[i]);
+            auto stop = high_resolution_clock::now();
+            auto duration = duration_cast<nanoseconds>(stop - start);
 
-int time_function(int (*test_function) (cache_type), cache_type cache1, int iterate = 1) {
-	int count = 0;
+            timer += duration.count();
+            ++count;
+        }
+        timer = (timer / TRIALS);
+        cout << "\tAverage time for space used of empty "<< sizeArray[i] << " bit cache: " << timer << " nanoseconds" << endl;
+    }
 
-	auto start = high_resolution_clock::now();
-	while (count < iterate){
-		(*test_function)(cache1);
-		++count;
-	}
-	auto stop = high_resolution_clock::now(); 
-	auto duration = duration_cast<microseconds>(stop - start); 
+    //fill up caches halfway
+    for(int j = 0; j < 3; j++){
+        index_type size = sizeArray[j] / 2;
+        cache_set(cacheArray[j], KEY1, make_str_of_defined_length(size), size);
+    }
 
-	auto final_time = duration.count() / iterate;
-	return final_time;
+    for(int i = 0; i < 3; i++) {
+        int count = 0;
+        float timer = 0;
+        while (count < TRIALS){
+            auto start = high_resolution_clock::now();
+            space = cache_space_used(cacheArray[i]);
+            auto stop = high_resolution_clock::now();
+            auto duration = duration_cast<nanoseconds>(stop - start);
+
+            timer += duration.count();
+            ++count;
+        }
+        timer = (timer / TRIALS);
+        cout << "\tAverage time for space used of 1/2filled "<< sizeArray[i] << " cache: " << timer << " nanoseconds" << endl;
+    }
+
+    for(int j = 0; j < 3; j++){
+        index_type size = sizeArray[j];
+        cache_set(cacheArray[j], KEY1, make_str_of_defined_length(size), size);
+    }
+
+    for(int i = 0; i < 3; i++) {
+        int count = 0;
+        float timer = 0;
+        while (count < TRIALS){
+            auto start = high_resolution_clock::now();
+            space = cache_space_used(cacheArray[i]);
+            auto stop = high_resolution_clock::now();
+            auto duration = duration_cast<nanoseconds>(stop - start);
+
+            timer += duration.count();
+            ++count;
+        }
+        timer = (timer / TRIALS);
+        cout << "\tAverage time for space used of filled "<< sizeArray[i] << " cache: " << timer << " nanoseconds" << endl;
+    }
+
+    return 0;
 }
-
-
 int 
 main()
 {
 	cache_type cache1 = create_cache(CACHE_SIZE, NULL);
-    int ITERATIONS = 1
 
     //Times the tests itself.  Not great for measuring the actual metrics. 
-    cout << "TIMING TESTS:"
-	cout << "Time taken to run test: create and destroy cache: "
-	     << time_function(test_create_cache_and_destroy_cache, cache1) << " microseconds" << endl;
+	cout << "Testing creating cache: " << endl;
+    test_create_cache_and_destroy_cache();
 
-	cout << "Time taken to run test: set and get: "
-	     << time_function(test_cache_set_and_get, cache1) << " microseconds" << endl;
+	cout << "Testing set: " << endl;
+	test_cache_set(cache1);
 
-	cout << "Time taken to run test: delete: "
-	     << time_function(test_cache_delete, cache1) << " microseconds" << endl;
+	cout << "Testing delete: " << endl;
+	test_cache_delete(cache1);
 
-	cout << "Time taken to run test: check space_used: "
-	     << time_function(test_cache_space_used, cache1) << " microseconds" << endl;
+	cout << "Testing check space_used: " << endl;
+	test_cache_space_used();
+
+    cout << "Testing get: " << endl;
+    test_cache_get();
 
 	destroy_cache(cache1);
 
     delete[] SMALLVAL;
     delete[] LARGEVAL;
-  
-
 }
