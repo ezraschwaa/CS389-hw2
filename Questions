@@ -21,4 +21,52 @@
 
 8. We implemented our experiment using many factors, each with a small but representative set of levels (i.e. for cache fill ratio we use only 3 levels spanning the entire space of level possibilities for that factor). Because we got similar results for each level, we found it unnecessary to fine-tune with many levels for more specific results, as our initial results did not leave a large amount of unexplained data. 
 
-9. Our results indicate (for a non-networked cache) no effect of cache size, value size, or cache fill ratio on performance of create_cache, delete_cache, get, set or del. This is likely because the vast majority of time spent on any service is spent finding the location associated with a request, rather than actually writing/reading/deleting to/from that location. Cache size does not affect create/delete_cache because these operations simply declare a cache rather than actually iterating through the memory allocated for it. Cache_size and val_size don't affect set because the relevant location is the first slot at the index which the relevant key hashes to. It is slightly surprising that cache fill ratio doesn't affect get or del, since higher fill ratios would correlate with more items being iterated through to find desire location (due to bucket hashing), however resizing the hash table when the load factor exceeds a certain threshold could mitigate this additional overhead.
+9. Our results indicate (for a non-networked cache) no effect of cache size, value size, or cache fill ratio on performance of create_cache, delete_cache, get, set or del. This is likely because the vast majority of time spent on any service is spent finding the location associated with a request, rather than actually writing/reading/deleting to/from that location. Cache size does not affect create/delete_cache because these operations simply declare a cache rather than actually iterating through the memory allocated for it. Cache_size and val_size don't affect set because the relevant location is the first slot at the index which the relevant key hashes to. It is slightly surprising that cache fill ratio doesn't affect get or del, since higher fill ratios would correlate with more items being iterated through to find desire location (due to bucket hashing), however resizing the hash table when the load factor exceeds a certain threshold could mitigate/eliminate this additional overhead.
+
+10. See separate file "computer systems hw 5 graph" (in this github repository) for a graphic representation of our data.
+
+
+Our raw Terminal results are:
+
+Testing creating cache: 
+	Average time to create a cache of size 64: 111.281 nanoseconds
+	Average time to create a cache of size 4096: 111.854 nanoseconds
+	Average time to create a cache of size 16777216: 109.121 nanoseconds
+Testing set: 
+	AVG Time to set 1-sized val in 64 sized cache: 64.1292 nanoseconds
+	AVG Time to set 1-sized val in 4096 sized cache: 65.9758 nanoseconds
+	AVG Time to set 1-sized val in 16777216 sized cache: 62.3014 nanoseconds
+	AVG Time to set 30-sized val in 64 sized cache: 63.2739 nanoseconds
+	AVG Time to set 30-sized val in 4096 sized cache: 65.7948 nanoseconds
+	AVG Time to set 30-sized val in 16777216 sized cache: 66.7005 nanoseconds
+Testing delete: 
+	AVG Time to delete 1-sized val in 64 sized cache: 63.3684 nanoseconds
+	AVG Time to delete 1-sized val in 4096 sized cache: 65.287 nanoseconds
+	AVG Time to delete 1-sized val in 16777216 sized cache: 65.0317 nanoseconds
+	AVG Time to delete 30-sized val in 64 sized cache: 64.6753 nanoseconds
+	AVG Time to delete 30-sized val in 4096 sized cache: 66.3193 nanoseconds
+	AVG Time to delete 30-sized val in 16777216 sized cache: 65.9616 nanoseconds
+Testing check space_used: 
+	Average time for space used of empty 64 bit cache: 29.3157 nanoseconds
+	Average time for space used of empty 4096 bit cache: 32.0338 nanoseconds
+	Average time for space used of empty 16777216 bit cache: 29.3745 nanoseconds
+	Average time for space used of 1/2filled 64 cache: 31.2715 nanoseconds
+	Average time for space used of 1/2filled 4096 cache: 29.9322 nanoseconds
+	Average time for space used of 1/2filled 16777216 cache: 30.0431 nanoseconds
+	Average time for space used of filled 64 cache: 29.7597 nanoseconds
+	Average time for space used of filled 4096 cache: 34.1519 nanoseconds
+	Average time for space used of filled 16777216 cache: 31.8601 nanoseconds
+Testing get: 
+	Average time to get in empty 64 bit cache: 45.0424 nanoseconds
+	Average time to get in empty 4096 bit cache: 42.7402 nanoseconds
+	Average time to get in empty 16777216 bit cache: 44.0214 nanoseconds
+	Average time to get in 1/2filled 64 cache: 51.7286 nanoseconds
+	Average time to get in 1/2filled 4096 cache: 52.8394 nanoseconds
+	Average time to get in 1/2filled 16777216 cache: 52.3153 nanoseconds
+	Average time for get of filled 64 cache: 52.2136 nanoseconds
+	Average time for get of filled 4096 cache: 48.0036 nanoseconds
+	Average time for get of filled 16777216 cache: 51.207 nanoseconds
+	
+	
+	
+	
